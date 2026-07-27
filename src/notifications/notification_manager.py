@@ -192,3 +192,36 @@ class NotificationManager:
             return True
 
         return False
+
+    def notify_digest(self, threats: List[Dict[str, Any]], digest_type: str = 'hourly') -> bool:
+        """
+        Send batched digest of threats (v1.2 feature).
+
+        Args:
+            threats: List of threats to include in digest
+            digest_type: 'hourly', 'daily', or 'weekly'
+
+        Returns:
+            True if email sent successfully, False otherwise
+        """
+        if not self.enabled or not self.recipients or not self.email_service:
+            return False
+
+        try:
+            html_body, text_body, subject = EmailTemplates.generate_digest_email(threats, digest_type)
+
+            results = self.email_service.send_bulk_email(
+                self.recipients,
+                subject,
+                html_body,
+                text_body
+            )
+
+            successful = sum(1 for success in results.values() if success)
+            self.logger.info(f"Digest ({digest_type}) sent to {successful}/{len(self.recipients)} recipients")
+
+            return successful > 0
+
+        except Exception as e:
+            self.logger.error(f"Failed to send digest: {str(e)}")
+            return False

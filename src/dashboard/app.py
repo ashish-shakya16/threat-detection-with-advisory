@@ -27,6 +27,9 @@ from src.assistant.ai_assistant import AIAssistant
 from src.dashboard.routes.api_threats import init_threats_routes
 from src.dashboard.routes.api_stats import init_stats_routes
 from src.dashboard.routes.api_analytics import init_analytics_routes
+from src.dashboard.routes.api_notifications import init_notifications_routes
+from src.dashboard.routes.api_ml import init_ml_routes
+from src.ml_models.ml_integration import MLIntegration
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -50,16 +53,33 @@ risk_scorer = RiskScorer(config.config)
 advisor = SecurityAdvisor(rules_data['advisory_templates'], config.config)
 ai_assistant = AIAssistant(db, config.config)
 
+# Initialize ML integration
+ml_integration = MLIntegration()
+
+# Initialize notification manager
+notification_manager = None
+notification_config = config.config.get('notifications', {})
+if notification_config.get('enabled', False):
+    try:
+        from src.notifications.notification_manager import NotificationManager
+        notification_manager = NotificationManager(notification_config)
+    except Exception as e:
+        logger.error(f"Failed to initialize notifications: {str(e)}")
+
 logger.info("Flask Dashboard initialized")
 
 # Register API blueprints
 threats_bp = init_threats_routes(db, app)
 stats_bp = init_stats_routes(db, app)
 analytics_bp = init_analytics_routes(db, app)
+notifications_bp = init_notifications_routes(notification_manager, app)
+ml_bp = init_ml_routes(ml_integration, db, app)
 
 app.register_blueprint(threats_bp)
 app.register_blueprint(stats_bp)
 app.register_blueprint(analytics_bp)
+app.register_blueprint(notifications_bp)
+app.register_blueprint(ml_bp)
 
 
 # ==================== WEB ROUTES ====================

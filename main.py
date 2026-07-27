@@ -27,6 +27,7 @@ from src.monitors import SystemMonitor, NetworkMonitor
 from src.detection import RuleEngine
 from src.risk_assessment import RiskScorer
 from src.advisory import SecurityAdvisor
+from src.ml_models.ml_integration import MLIntegration
 
 
 class ThreatAdvisor:
@@ -90,6 +91,10 @@ class ThreatAdvisor:
         self.logger.info("Initializing advisory system...")
         advisory_templates = rules_data.get('advisory_templates', {})
         self.advisor = SecurityAdvisor(advisory_templates, self.config.config)
+
+        # Initialize ML anomaly detection
+        self.logger.info("Initializing ML anomaly detection...")
+        self.ml_integration = MLIntegration()
 
         # Initialize notification system
         self.notification_manager = None
@@ -160,6 +165,11 @@ class ThreatAdvisor:
             # 4. Risk Assessment
             for threat in threats:
                 threat = self.risk_scorer.calculate_risk(threat)
+
+                # 4b. ML-based anomaly scoring (enrichment)
+                ml_risk = self.ml_integration.calculate_ml_risk_score(threat)
+                threat = self.ml_integration.enrich_threat_with_ml_score(threat, ml_risk)
+
                 all_threats.append(threat)
             
             # 5. Generate Advisories and Log
@@ -354,7 +364,19 @@ def main():
         default=24,
         help='Time window in hours for queries (default: 24)'
     )
-    
+
+    parser.add_argument(
+        '--train-ml',
+        action='store_true',
+        help='Train ML anomaly detection model'
+    )
+
+    parser.add_argument(
+        '--ml-status',
+        action='store_true',
+        help='Show ML model status'
+    )
+
     args = parser.parse_args()
     
     # Initialize directories
@@ -373,13 +395,32 @@ def main():
     # Handle commands
     if args.list_threats:
         advisor.list_recent_threats(hours=args.hours)
-    
+
     elif args.stats:
         advisor.show_statistics(hours=args.hours)
-    
+
+    elif args.train_ml:
+        print("Training ML anomaly detection model...")
+        events = advisor.db.get_recent_threats(limit=500, hours=720)
+        if events:
+            success = advisor.ml_integration.train_model(events)
+            if success:
+                print("✓ ML model trained successfully")
+            else:
+                print("✗ ML model training failed")
+        else:
+            print("No historical data available for training")
+
+    elif args.ml_status:
+        stats = advisor.ml_integration.get_model_stats()
+        print("\nML Model Status:")
+        print(f"  Trained: {stats['trained']}")
+        print(f"  Status: {stats['status']}")
+        print(f"  Model Path: {stats['model_path']}")
+
     elif args.scan:
         advisor.scan_once()
-    
+
     else:
         # Default: continuous monitoring
         advisor.run_continuous(interval=args.interval)

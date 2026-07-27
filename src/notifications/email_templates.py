@@ -437,3 +437,215 @@ Top Threats:
         subject = f"SecureX Daily Summary - {total} threats detected"
 
         return html_body, text_body, subject
+
+    @classmethod
+    def generate_digest_email(cls, threats: list, digest_type: str = 'hourly') -> tuple:
+        """
+        Generate digest email with multiple threats batched (v1.2 feature).
+
+        Args:
+            threats: List of threat dictionaries
+            digest_type: 'hourly', 'daily', or 'weekly'
+
+        Returns:
+            Tuple of (html_body, text_body, subject)
+        """
+        total = len(threats)
+        critical = sum(1 for t in threats if t.get('risk_level') == 'Critical')
+        high = sum(1 for t in threats if t.get('risk_level') == 'High')
+
+        time_label = {'hourly': 'past hour', 'daily': 'past day', 'weekly': 'past week'}.get(digest_type, 'period')
+
+        html_body = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f5f5;
+        }}
+        .container {{
+            max-width: 700px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }}
+        .header {{
+            background-color: #1976d2;
+            color: white;
+            padding: 24px;
+            text-align: center;
+        }}
+        .content {{
+            padding: 24px;
+        }}
+        .summary-stats {{
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin: 16px 0;
+        }}
+        .stat-card {{
+            text-align: center;
+            padding: 16px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+        }}
+        .stat-value {{
+            font-size: 32px;
+            font-weight: bold;
+            color: #1976d2;
+        }}
+        .stat-label {{
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-top: 4px;
+        }}
+        .threat-table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+        }}
+        .threat-table thead {{
+            background-color: #f5f5f5;
+            border-bottom: 2px solid #ddd;
+        }}
+        .threat-table th {{
+            text-align: left;
+            padding: 12px;
+            font-weight: bold;
+            color: #333;
+        }}
+        .threat-table td {{
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }}
+        .threat-table tr:hover {{
+            background-color: #fafafa;
+        }}
+        .badge {{
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+        }}
+        .badge.critical {{
+            background-color: #ffebee;
+            color: #d32f2f;
+        }}
+        .badge.high {{
+            background-color: #fff3e0;
+            color: #f57c00;
+        }}
+        .badge.medium {{
+            background-color: #fffde7;
+            color: #f9a825;
+        }}
+        .badge.low {{
+            background-color: #e8f5e9;
+            color: #388e3c;
+        }}
+        .footer {{
+            background-color: #f5f5f5;
+            padding: 16px 24px;
+            border-top: 1px solid #e0e0e0;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{digest_type.capitalize()} Threat Digest</h1>
+            <p>Summary for the {time_label}</p>
+        </div>
+
+        <div class="content">
+            <div class="summary-stats">
+                <div class="stat-card">
+                    <div class="stat-value">{total}</div>
+                    <div class="stat-label">Total Threats</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: #d32f2f;">{critical}</div>
+                    <div class="stat-label">Critical</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: #f57c00;">{high}</div>
+                    <div class="stat-label">High</div>
+                </div>
+            </div>
+
+            <table class="threat-table">
+                <thead>
+                    <tr>
+                        <th>Threat Name</th>
+                        <th>Severity</th>
+                        <th>Score</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+"""
+
+        for threat in threats[:20]:
+            name = escape(threat.get('threat_name', 'Unknown'))
+            level = threat.get('risk_level', 'Unknown')
+            score = threat.get('risk_score', 0)
+            time = threat.get('timestamp', 'Unknown')[:16]
+            badge_class = level.lower()
+            html_body += f"""                    <tr>
+                        <td>{name}</td>
+                        <td><span class="badge {badge_class}">{level}</span></td>
+                        <td>{score:.1%}</td>
+                        <td>{time}</td>
+                    </tr>
+"""
+
+        html_body += """                </tbody>
+            </table>
+
+            <p style="font-size: 12px; color: #666; margin-top: 16px;">
+                Showing {0} of {1} threats. Visit the dashboard for complete details.
+            </p>
+        </div>
+
+        <div class="footer">
+            <p>Copyright 2026 SecureX. All rights reserved.<br/>
+            This is an automated digest email. Do not reply to this email.</p>
+        </div>
+    </div>
+</body>
+</html>
+""".format(min(20, total), total)
+
+        text_body = f"""{digest_type.upper()} THREAT DIGEST
+
+Summary for the {time_label}:
+Total Threats: {total}
+Critical: {critical}
+High: {high}
+
+Threats ({min(20, total)} of {total}):
+"""
+        for threat in threats[:20]:
+            name = threat.get('threat_name', 'Unknown')
+            level = threat.get('risk_level', 'Unknown')
+            score = threat.get('risk_score', 0)
+            text_body += f"- {name} ({level}, {score:.1%})\n"
+
+        text_body += "\n---\nVisit the dashboard for complete details.\nSecureX - Automated digest"
+
+        subject = f"SecureX {digest_type.capitalize()} Digest - {total} threats"
+
+        return html_body, text_body, subject
