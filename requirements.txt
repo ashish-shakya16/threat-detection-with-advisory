@@ -1,0 +1,24 @@
+# Core web framework
+Flask>=3.0
+Flask-Cors>=4.0
+Flask-SocketIO>=5.3
+python-socketio>=5.11
+simple-websocket>=1.0
+
+# System/network monitoring
+psutil>=6.0
+
+# Config and utilities
+PyYAML>=6.0
+requests>=2.31
+
+# Machine learning
+numpy>=1.26
+scikit-learn>=1.5
+
+# Notifications (SMS - optional but imported if enabled)
+twilio==9.0.4
+
+# Testing
+pytest>=8.0
+pytest-asyncio>=1.0
