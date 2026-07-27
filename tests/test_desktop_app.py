@@ -189,5 +189,21 @@ class TestSeverityCasingBugFix(unittest.TestCase):
         self.assertTrue(all(t['severity'] == 'high' for t in filtered))
 
 
+@unittest.skipUnless(PYQT6_AVAILABLE, "PyQt6 not installed")
+class TestCloseEventCleanup(unittest.TestCase):
+    """Verify MainWindow.closeEvent stops the refresh timer and any running scan thread."""
+
+    def setUp(self):
+        self.qapp = QApplication.instance() or QApplication([])
+
+    def test_close_event_stops_refresh_timer(self):
+        window = MainWindow()
+        self.assertTrue(window.refresh_timer.isActive())
+
+        window.close()
+
+        self.assertFalse(window.refresh_timer.isActive())
+
+
 if __name__ == '__main__':
     unittest.main()

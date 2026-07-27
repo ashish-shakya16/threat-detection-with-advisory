@@ -742,6 +742,16 @@ Advisory: {threat.get('advisory', {}).get('summary', 'No advisory')}
             except Exception as e:
                 QMessageBox.critical(self, "Error", str(e))
 
+    def closeEvent(self, event):
+        """Clean up the refresh timer and any running scan thread before closing."""
+        self.refresh_timer.stop()
+
+        if self.scan_worker and self.scan_worker.isRunning():
+            self.scan_worker.requestInterruption()
+            self.scan_worker.wait(3000)  # Wait up to 3 seconds for graceful shutdown
+
+        event.accept()
+
     def optimize_database(self):
         """Optimize database"""
         try:
