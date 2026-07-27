@@ -3,6 +3,8 @@
 from flask import Blueprint, jsonify, request
 import logging
 
+from src.auth import login_required
+
 logger = logging.getLogger('securex')
 
 analytics_bp = Blueprint('analytics', __name__, url_prefix='/api/analytics')
@@ -12,6 +14,7 @@ def init_analytics_routes(db, app):
     """Initialize analytics routes"""
 
     @analytics_bp.route('/timeline', methods=['GET'])
+    @login_required
     def get_threat_timeline():
         """Get threat detection timeline"""
         try:
@@ -29,6 +32,7 @@ def init_analytics_routes(db, app):
             }), 500
 
     @analytics_bp.route('/top-threats', methods=['GET'])
+    @login_required
     def get_top_threats():
         """Get most frequent threats"""
         try:
@@ -46,6 +50,7 @@ def init_analytics_routes(db, app):
             }), 500
 
     @analytics_bp.route('/detection-rate', methods=['GET'])
+    @login_required
     def get_detection_rate():
         """Get detection rate statistics"""
         try:

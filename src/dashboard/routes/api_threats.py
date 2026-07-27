@@ -3,6 +3,8 @@
 from flask import Blueprint, jsonify, request
 import logging
 
+from src.auth import login_required
+
 logger = logging.getLogger('securex')
 
 threats_bp = Blueprint('threats', __name__, url_prefix='/api/threats')
@@ -12,6 +14,7 @@ def init_threats_routes(db, app):
     """Initialize threats routes"""
 
     @threats_bp.route('/', methods=['GET'])
+    @login_required
     def get_threats():
         """Get all threats with filtering"""
         try:
@@ -37,6 +40,7 @@ def init_threats_routes(db, app):
             }), 500
 
     @threats_bp.route('/<int:threat_id>', methods=['GET'])
+    @login_required
     def get_threat_detail(threat_id):
         """Get detailed threat information"""
         try:
@@ -59,6 +63,7 @@ def init_threats_routes(db, app):
             }), 500
 
     @threats_bp.route('/<int:threat_id>/status', methods=['PUT'])
+    @login_required
     def update_threat_status(threat_id):
         """Update threat status"""
         try:
@@ -85,6 +90,7 @@ def init_threats_routes(db, app):
             }), 500
 
     @threats_bp.route('/critical', methods=['GET'])
+    @login_required
     def get_critical_threats():
         """Get only critical threats"""
         try:

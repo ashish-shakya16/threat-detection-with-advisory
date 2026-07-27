@@ -3,6 +3,8 @@
 from flask import Blueprint, jsonify, request
 import logging
 
+from src.auth import login_required
+
 logger = logging.getLogger('securex')
 
 ml_bp = Blueprint('ml', __name__, url_prefix='/api/ml')
@@ -12,6 +14,7 @@ def init_ml_routes(ml_integration, db, app):
     """Initialize ML routes"""
 
     @ml_bp.route('/status', methods=['GET'])
+    @login_required
     def get_ml_status():
         """Get ML model status"""
         try:
@@ -36,6 +39,7 @@ def init_ml_routes(ml_integration, db, app):
             }), 500
 
     @ml_bp.route('/train', methods=['POST'])
+    @login_required
     def train_ml_model():
         """Train ML anomaly detection model"""
         try:
@@ -67,6 +71,7 @@ def init_ml_routes(ml_integration, db, app):
             }), 500
 
     @ml_bp.route('/predict', methods=['POST'])
+    @login_required
     def predict_anomaly():
         """Predict if event is anomaly"""
         try:

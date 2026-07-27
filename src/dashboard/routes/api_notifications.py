@@ -3,6 +3,8 @@
 from flask import Blueprint, jsonify, request
 import logging
 
+from src.auth import login_required
+
 logger = logging.getLogger('securex')
 
 notifications_bp = Blueprint('notifications', __name__, url_prefix='/api/notifications')
@@ -12,6 +14,7 @@ def init_notifications_routes(notification_manager, app):
     """Initialize notifications routes"""
 
     @notifications_bp.route('/status', methods=['GET'])
+    @login_required
     def get_notification_status():
         """Get notification system status"""
         try:
@@ -41,6 +44,7 @@ def init_notifications_routes(notification_manager, app):
             }), 500
 
     @notifications_bp.route('/recipients', methods=['GET'])
+    @login_required
     def get_recipients():
         """Get notification recipients"""
         try:
@@ -62,6 +66,7 @@ def init_notifications_routes(notification_manager, app):
             }), 500
 
     @notifications_bp.route('/recipients', methods=['POST'])
+    @login_required
     def add_recipient():
         """Add notification recipient"""
         try:
@@ -93,6 +98,7 @@ def init_notifications_routes(notification_manager, app):
             }), 500
 
     @notifications_bp.route('/recipients/<email>', methods=['DELETE'])
+    @login_required
     def remove_recipient(email):
         """Remove notification recipient"""
         try:
@@ -115,6 +121,7 @@ def init_notifications_routes(notification_manager, app):
             }), 500
 
     @notifications_bp.route('/test', methods=['POST'])
+    @login_required
     def test_notification():
         """Send test notification"""
         try:

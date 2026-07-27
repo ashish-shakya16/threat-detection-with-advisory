@@ -116,5 +116,52 @@ class TestLoginRoute(unittest.TestCase):
         self.assertIn('/login', response.headers['Location'])
 
 
+class TestBlueprintRoutesRequireAuth(unittest.TestCase):
+    def setUp(self):
+        fd, self.db_path = tempfile.mkstemp(suffix='.db')
+        os.close(fd)
+        os.remove(self.db_path)
+
+        os.environ['SECRET_KEY'] = 'test-secret-key'
+        os.environ['THREAT_DB_PATH'] = self.db_path
+
+        import importlib
+        import src.dashboard.routes.api_threats as api_threats
+        import src.dashboard.routes.api_stats as api_stats
+        import src.dashboard.routes.api_analytics as api_analytics
+        import src.dashboard.routes.api_notifications as api_notifications
+        import src.dashboard.routes.api_ml as api_ml
+        import src.dashboard.app as app_module
+
+        importlib.reload(api_threats)
+        importlib.reload(api_stats)
+        importlib.reload(api_analytics)
+        importlib.reload(api_notifications)
+        importlib.reload(api_ml)
+        importlib.reload(app_module)
+
+        self.app_module = app_module
+        self.app_module.app.config['TESTING'] = True
+        self.client = self.app_module.app.test_client()
+
+    def tearDown(self):
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
+        os.environ.pop('SECRET_KEY', None)
+        os.environ.pop('THREAT_DB_PATH', None)
+
+    def test_threats_api_returns_401_when_unauthenticated(self):
+        response = self.client.get('/api/threats/')
+        self.assertEqual(response.status_code, 401)
+
+    def test_stats_api_returns_401_when_unauthenticated(self):
+        response = self.client.get('/api/stats/')
+        self.assertEqual(response.status_code, 401)
+
+    def test_ml_status_api_returns_401_when_unauthenticated(self):
+        response = self.client.get('/api/ml/status')
+        self.assertEqual(response.status_code, 401)
+
+
 if __name__ == '__main__':
     unittest.main()

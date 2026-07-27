@@ -3,6 +3,8 @@
 from flask import Blueprint, jsonify
 import logging
 
+from src.auth import login_required
+
 logger = logging.getLogger('securex')
 
 stats_bp = Blueprint('stats', __name__, url_prefix='/api/stats')
@@ -12,6 +14,7 @@ def init_stats_routes(db, app):
     """Initialize statistics routes"""
 
     @stats_bp.route('/', methods=['GET'])
+    @login_required
     def get_stats():
         """Get overall statistics"""
         try:
@@ -28,6 +31,7 @@ def init_stats_routes(db, app):
             }), 500
 
     @stats_bp.route('/by-category', methods=['GET'])
+    @login_required
     def get_stats_by_category():
         """Get threat statistics by category"""
         try:
@@ -44,6 +48,7 @@ def init_stats_routes(db, app):
             }), 500
 
     @stats_bp.route('/by-severity', methods=['GET'])
+    @login_required
     def get_stats_by_severity():
         """Get threat statistics by severity"""
         try:
