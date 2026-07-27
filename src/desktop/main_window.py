@@ -580,7 +580,7 @@ class MainWindow(QMainWindow):
                 risk_score = threat.get('risk_score', 0)
                 self.recent_threats_table.setItem(row, 2, QTableWidgetItem(f"{risk_score:.2f}"))
                 self.recent_threats_table.setItem(row, 3, QTableWidgetItem(threat.get('category', '')))
-                self.recent_threats_table.setItem(row, 4, QTableWidgetItem(threat.get('timestamp', '')[:16]))
+                self.recent_threats_table.setItem(row, 4, QTableWidgetItem(str(threat.get('detected_at', ''))[:16]))
                 self.recent_threats_table.setItem(row, 5, QTableWidgetItem("New"))
 
         except Exception as e:
@@ -606,7 +606,7 @@ class MainWindow(QMainWindow):
                 risk_score = threat.get('risk_score', 0)
                 self.threats_table.setItem(row, 3, QTableWidgetItem(f"{risk_score:.2f}"))
                 self.threats_table.setItem(row, 4, QTableWidgetItem(threat.get('category', '')))
-                self.threats_table.setItem(row, 5, QTableWidgetItem(threat.get('timestamp', '')[:16]))
+                self.threats_table.setItem(row, 5, QTableWidgetItem(str(threat.get('detected_at', ''))[:16]))
 
                 advisory_text = threat.get('advisory', {}).get('summary', '')[:50]
                 self.threats_table.setItem(row, 6, QTableWidgetItem(advisory_text))
@@ -626,7 +626,7 @@ Threat: {threat.get('threat_name', 'Unknown')}
 Severity: {threat.get('severity', 'Unknown')}
 Risk Score: {threat.get('risk_score', 0):.2f}
 Category: {threat.get('category', 'Unknown')}
-Time: {threat.get('timestamp', 'Unknown')}
+Time: {threat.get('detected_at', 'Unknown')}
 
 Description: {threat.get('description', 'No description')}
 

@@ -204,27 +204,30 @@ def get_threat_timeline():
     try:
         hours = int(request.args.get('hours', 24))
         threats = db.get_recent_threats(limit=1000, hours=hours)
-        
+
         # Group by hour
         timeline = {}
         for threat in threats:
-            timestamp = datetime.fromisoformat(threat['timestamp'])
+            detected_at = threat.get('detected_at')
+            if not detected_at:
+                continue
+            timestamp = datetime.fromisoformat(detected_at)
             hour_key = timestamp.strftime('%Y-%m-%d %H:00')
-            
+
             if hour_key not in timeline:
                 timeline[hour_key] = {'count': 0, 'critical': 0, 'high': 0, 'medium': 0, 'low': 0}
-            
+
             timeline[hour_key]['count'] += 1
-            severity = threat['severity'].lower()
+            severity = str(threat.get('severity', '')).lower()
             if severity in timeline[hour_key]:
                 timeline[hour_key][severity] += 1
-        
+
         # Convert to sorted list
         timeline_list = [
-            {'time': k, **v} 
+            {'time': k, **v}
             for k, v in sorted(timeline.items())
         ]
-        
+
         return jsonify({
             'success': True,
             'data': timeline_list
@@ -444,36 +447,6 @@ def handle_request_update():
         emit('stats_update', stats)
     except Exception as e:
         logger.error(f"Error sending update: {e}")
-
-
-# ==================== UTILITY FUNCTIONS ====================
-
-def add_get_threat_by_id_to_db():
-    """Add missing method to DatabaseManager if needed"""
-    if not hasattr(db, 'get_threat_by_id'):
-        def get_threat_by_id(self, threat_id):
-            import sqlite3
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                SELECT * FROM threats WHERE id = ?
-            ''', (threat_id,))
-            
-            row = cursor.fetchone()
-            conn.close()
-            
-            if row:
-                return dict(row)
-            return None
-        
-        # Add method to instance
-        import types
-        db.get_threat_by_id = types.MethodType(get_threat_by_id, db)
-
-# Add the method
-add_get_threat_by_id_to_db()
 
 
 # ==================== MAIN ====================
