@@ -34,3 +34,15 @@ class AIAssistantException(SecureXException):
 class ValidationException(SecureXException):
     """Data validation exceptions"""
     pass
+
+
+class NotificationException(SecureXException):
+    """
+    Raised when email notification or alert delivery fails.
+
+    Examples:
+    - SMTP connection failure
+    - Invalid email configuration
+    - Recipient validation failure
+    """
+    pass
