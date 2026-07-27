@@ -86,6 +86,7 @@ desktop.ini
 # Editor and build metadata
 .vs/
 coverage/
+.playwright-mcp/
 
 # Keep directory structure but ignore contents
 !data/db/.gitkeep

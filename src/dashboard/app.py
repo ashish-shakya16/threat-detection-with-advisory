@@ -47,7 +47,9 @@ if not secret_key:
         )
 app.config['SECRET_KEY'] = secret_key
 
-allowed_origins = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5000').split(',')
+allowed_origins = os.environ.get(
+    'CORS_ALLOWED_ORIGINS', 'http://localhost:5000,http://localhost:5173'
+).split(',')
 CORS(app, origins=allowed_origins)
 socketio = SocketIO(app, cors_allowed_origins=allowed_origins)
 
