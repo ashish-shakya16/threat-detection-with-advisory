@@ -4,63 +4,122 @@ Provides intelligent responses to security queries using context from the system
 """
 
 import json
+import os
 from typing import Dict, List, Any
 from datetime import datetime, timezone
 
+# Langchain and RAG imports
+try:
+    from langchain_huggingface import HuggingFaceEndpoint, HuggingFaceEmbeddings
+    from langchain_community.vectorstores import Chroma
+    from langchain_core.documents import Document
+    from langchain_core.prompts import PromptTemplate
+    from langchain_core.output_parsers import StrOutputParser
+    RAG_ENABLED = True
+except ImportError:
+    RAG_ENABLED = False
+
 
 class AIAssistant:
-    """AI-powered security assistant"""
+    """AI-powered security assistant using Hugging Face RAG"""
     
     def __init__(self, db_manager, config: Dict = None):
         """Initialize the AI assistant"""
         self.db = db_manager
         self.config = config or {}
         self.context_window = []  # Store conversation context
+        self.rag_enabled = False
+        
+        if RAG_ENABLED:
+            try:
+                self._setup_rag()
+                self.rag_enabled = True
+            except Exception as e:
+                print(f"Failed to initialize RAG: {e}")
+                
+    def _setup_rag(self):
+        """Set up Langchain, Embeddings, LLM, and Vector Database"""
+        # Set the Hugging Face API key
+        os.environ["HUGGINGFACEHUB_API_TOKEN"] = "REMOVED_SECRET"
+        
+        # 1. Setup the LLM endpoint
+        from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
+        hf_endpoint = HuggingFaceEndpoint(
+            repo_id="Qwen/Qwen2.5-72B-Instruct",
+            max_new_tokens=512,
+            temperature=0.3,
+        )
+        self.llm = ChatHuggingFace(llm=hf_endpoint)
+        
+        # 2. Setup local embeddings model
+        self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        
+        # 3. Load Documents (Our rules.json data for context)
+        docs = []
+        if os.path.exists('config/rules.json'):
+            with open('config/rules.json', 'r') as f:
+                rules_data = json.load(f)
+                for rule in rules_data.get('rules', []):
+                        content = f"Rule ID: {rule.get('id', 'Unknown')} | Name: '{rule.get('name')}' | Description: Detects {rule.get('description')}. Category: {rule.get('category')}. Severity: {rule.get('severity')}."
+        
+        # Fallback empty doc if vector db needs initialization
+        if not docs:
+            docs.append(Document(page_content="System initialized with no specific rules.", metadata={"source": "system"}))
+            
+        # 4. Create and persist Chroma Vector Store
+        os.makedirs("data/db", exist_ok=True)
+        self.vectorstore = Chroma.from_documents(docs, self.embeddings, persist_directory="data/db/chroma_db")
+        self.retriever = self.vectorstore.as_retriever(search_kwargs={"k": 3})
+        
+        # 5. Define the Prompt Template
+        template = """You are SecureAI, a professional cybersecurity assistant. 
+Use the following pieces of retrieved context and the provided recent system threats to answer the user's question.
+If you don't know the answer or the context is insufficient, just say that you don't know, don't try to make up an answer.
+Format your response using Markdown. Keep it concise, helpful, and professional.
+
+Retrieved Knowledge/Rules Base Context:
+{context}
+
+Recent System Threats Context:
+{threat_context}
+
+User Question: {question}
+
+Response:"""
+        self.prompt = PromptTemplate.from_template(template)
         
     def process_query(self, user_message: str) -> str:
-        """Process user query and generate response"""
-        message_lower = user_message.lower()
+        """Process user query using RAG and generate response"""
         
-        # Get system context
+        if not self.rag_enabled:
+            return "⚠️ RAG is not fully initialized. Please ensure the required libraries are installed:\n`pip install langchain langchain-community langchain-huggingface chromadb sentence-transformers huggingface-hub`\nThen restart the dashboard."
+        
+        # Fetch dynamic context from the DB
         threats = self.db.get_recent_threats(hours=24)
-        stats = self.db.get_threat_statistics(hours=24)
         
-        # Pattern matching for different query types
-        if any(word in message_lower for word in ['hello', 'hi', 'hey', 'greetings']):
-            return self._greeting_response()
+        threat_context = "No recent threats detected."
+        if threats:
+            threat_context = "Recent Threats (Last 24h):\n" + "\n".join(
+                [f"- {t.get('threat_name', 'Unknown Threat')} (Severity: {t.get('severity', 'Unknown')}) at {t.get('timestamp', '')}" for t in threats[:5]]
+            )
             
-        elif any(word in message_lower for word in ['threat', 'detected', 'found', 'alert']):
-            return self._threat_summary_response(threats, stats)
+        try:
+            # Retrieve documents
+            retrieved_docs = self.retriever.invoke(user_message)
+            context_text = "\n".join([doc.page_content for doc in retrieved_docs])
             
-        elif any(word in message_lower for word in ['latest', 'recent', 'new', 'last']):
-            return self._latest_threat_response(threats)
+            # Chain everything together & predict
+            chain = self.prompt | self.llm | StrOutputParser()
+            response = chain.invoke({
+                "context": context_text,
+                "threat_context": threat_context,
+                "question": user_message
+            })
+            return response
             
-        elif any(word in message_lower for word in ['critical', 'severe', 'high priority', 'urgent']):
-            return self._critical_threats_response(threats)
-            
-        elif any(word in message_lower for word in ['how to', 'what should', 'recommend', 'advice', 'improve']):
-            return self._recommendations_response(threats, stats)
-            
-        elif any(word in message_lower for word in ['explain', 'what is', 'tell me about', 'describe']):
-            return self._explain_threat_response(threats, user_message)
-            
-        elif any(word in message_lower for word in ['safe', 'secure', 'protected', 'ok']):
-            return self._security_status_response(stats)
-            
-        elif any(word in message_lower for word in ['scan', 'check', 'analyze', 'inspect']):
-            return self._scan_recommendation()
-            
-        elif any(word in message_lower for word in ['help', 'what can you do', 'capabilities']):
-            return self._help_response()
-            
-        elif any(word in message_lower for word in ['cpu', 'memory', 'disk', 'resource', 'performance']):
-            return self._resource_analysis_response(threats)
-            
-        elif any(word in message_lower for word in ['network', 'connection', 'port', 'traffic']):
-            return self._network_analysis_response(threats)
-            
-        else:
-            return self._general_security_advice()
+        except Exception as e:
+            return f"❌ Error generating response from AI model:\n{str(e)}\n\nMake sure your Hugging Face limit isn't reached and internet connection is active."
+
     
     def _greeting_response(self) -> str:
         """Generate greeting response"""

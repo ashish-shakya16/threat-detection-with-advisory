@@ -55,6 +55,7 @@ cd a:\codes\pbl
 2. **Create virtual environment:**
 ```bash
 python -m venv venv
+
 ```
 
 3. **Activate virtual environment:**

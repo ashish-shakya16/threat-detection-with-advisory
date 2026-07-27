@@ -26,6 +26,11 @@ env/
 ENV/
 .venv
 
+# Local environment files
+.env
+.env.*
+!.env.example
+
 # IDE
 .vscode/
 .idea/
@@ -37,10 +42,16 @@ ENV/
 # Logs
 *.log
 data/logs/*.log
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.cache/
 
 # Database
 data/db/*.db
 data/db/*.db-journal
+data/db/*.sqlite3
+data/db/chroma_db/
 
 # ML Models
 src/ml_models/saved_models/*.pkl
@@ -55,8 +66,8 @@ data/datasets/*.json
 *.ipynb
 
 # Testing
-.pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 
 # OS
@@ -71,6 +82,10 @@ desktop.ini
 # Temporary files
 *.tmp
 *.temp
+
+# Editor and build metadata
+.vs/
+coverage/
 
 # Keep directory structure but ignore contents
 !data/db/.gitkeep
