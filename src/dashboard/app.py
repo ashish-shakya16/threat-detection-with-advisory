@@ -417,7 +417,16 @@ def perform_scan():
         if threat:
             # Step 3: Calculate risk score
             threat_with_risk = risk_scorer.calculate_risk(threat)
-            
+
+            # Step 3b: Adjust for off-hours activity (10pm-6am local time is
+            # more suspicious than daytime activity for the same event)
+            current_hour = datetime.now().hour
+            is_off_hours = current_hour >= 22 or current_hour < 6
+            if is_off_hours:
+                threat_with_risk = risk_scorer.adjust_risk_by_context(
+                    threat_with_risk, {'off_hours': True}
+                )
+
             # Step 4: Generate advisory
             advisory = advisor.generate_advisory(threat_with_risk)
             
@@ -467,8 +476,8 @@ def monitoring_loop():
                     'timestamp': datetime.now().isoformat()
                 }
                 socketio.emit('system_metrics', metrics)
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to emit system metrics: {e}")
             
             # Wait before next scan
             interval = config.get('monitoring.system.interval', 5)

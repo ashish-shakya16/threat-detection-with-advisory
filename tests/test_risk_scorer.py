@@ -105,6 +105,22 @@ class TestRiskScorer(unittest.TestCase):
         self.assertIn('impact_score', components)
         self.assertIn('prevalence_score', components)
 
+    def test_adjust_risk_by_context_increases_score_for_off_hours(self):
+        threat = {'risk_score': 0.5, 'risk_level': 'Medium'}
+
+        adjusted = self.scorer.adjust_risk_by_context(threat, {'off_hours': True})
+
+        self.assertGreater(adjusted['risk_score'], 0.5)
+        self.assertIn('Increased: Off-hours activity', adjusted['risk_adjustments'])
+
+    def test_adjust_risk_by_context_no_change_without_context_flags(self):
+        threat = {'risk_score': 0.5, 'risk_level': 'Medium'}
+
+        adjusted = self.scorer.adjust_risk_by_context(threat, {})
+
+        self.assertEqual(adjusted['risk_score'], 0.5)
+        self.assertEqual(adjusted['risk_adjustments'], [])
+
 
 if __name__ == '__main__':
     unittest.main()
