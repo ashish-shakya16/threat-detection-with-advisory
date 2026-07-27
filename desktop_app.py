@@ -24,6 +24,7 @@ except ImportError:
 sys.path.insert(0, os.path.dirname(__file__))
 
 from src.desktop.main_window import MainWindow
+from PyQt6.QtGui import QFont
 
 
 def main():
@@ -33,6 +34,8 @@ def main():
     # Application metadata
     app.setApplicationName("SecureX Threat Advisor")
     app.setApplicationVersion("1.2.0")
+    app.setStyle("Fusion")
+    app.setFont(QFont("Segoe UI", 9))
 
     # Create and show main window
     window = MainWindow()

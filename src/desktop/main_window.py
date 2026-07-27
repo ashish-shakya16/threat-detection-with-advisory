@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QSize
 from PyQt6.QtGui import QIcon, QFont, QColor, QBrush
+from PyQt6.QtWidgets import QStyle
 from PyQt6.QtCharts import QChart, QChartView, QLineSeries
 from PyQt6.QtCore import QPointF
 
@@ -32,6 +33,7 @@ from src.risk_assessment.risk_scorer import RiskScorer
 from src.advisory.advisor import SecurityAdvisor
 from src.ml_models.ml_integration import MLIntegration
 from src.notifications.notification_manager import NotificationManager
+from src.desktop.theme import Palette, STYLESHEET, severity_badge_style
 
 
 class ScanWorker(QThread):
@@ -94,6 +96,8 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("SecureX Threat Advisor - Desktop")
         self.setGeometry(100, 100, 1400, 900)
+        self.setMinimumSize(1100, 700)
+        self.setWindowIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon))
 
         # Initialize backend
         self.config = Config('config/config.yaml')
@@ -126,54 +130,63 @@ class MainWindow(QMainWindow):
 
     def init_ui(self):
         """Initialize user interface"""
+        self.setStyleSheet(STYLESHEET)
+
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
         # Main layout
         main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(16, 16, 16, 8)
+        main_layout.setSpacing(12)
+
+        style = self.style()
 
         # Top control bar
         control_layout = QHBoxLayout()
+        control_layout.setSpacing(8)
 
-        self.scan_button = QPushButton("🔍 Scan Now")
-        self.scan_button.setMinimumHeight(35)
+        title_label = QLabel("SecureX Threat Advisor")
+        title_font = QFont()
+        title_font.setPointSize(13)
+        title_font.setBold(True)
+        title_label.setFont(title_font)
+
+        self.scan_button = QPushButton(" Scan Now")
+        self.scan_button.setObjectName("primaryButton")
+        self.scan_button.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
+        self.scan_button.setMinimumHeight(36)
         self.scan_button.clicked.connect(self.start_scan)
 
-        self.train_ml_button = QPushButton("🧠 Train ML Model")
-        self.train_ml_button.setMinimumHeight(35)
+        self.train_ml_button = QPushButton(" Train ML Model")
+        self.train_ml_button.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
+        self.train_ml_button.setMinimumHeight(36)
         self.train_ml_button.clicked.connect(self.train_ml_model)
 
-        self.clear_button = QPushButton("🗑️ Clear Old")
-        self.clear_button.setMinimumHeight(35)
+        self.clear_button = QPushButton(" Clear Old")
+        self.clear_button.setObjectName("dangerButton")
+        self.clear_button.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
+        self.clear_button.setMinimumHeight(36)
         self.clear_button.clicked.connect(self.clear_old_threats)
 
+        control_layout.addWidget(title_label)
+        control_layout.addStretch()
         control_layout.addWidget(self.scan_button)
         control_layout.addWidget(self.train_ml_button)
         control_layout.addWidget(self.clear_button)
-        control_layout.addStretch()
 
         main_layout.addLayout(control_layout)
 
         # Tabs
         tabs = QTabWidget()
+        tabs.setDocumentMode(True)
 
-        # Tab 1: Dashboard
-        tabs.addTab(self.create_dashboard_tab(), "📊 Dashboard")
-
-        # Tab 2: Threats
-        tabs.addTab(self.create_threats_tab(), "🚨 Threats")
-
-        # Tab 3: Statistics
-        tabs.addTab(self.create_stats_tab(), "📈 Statistics")
-
-        # Tab 4: ML Model
-        tabs.addTab(self.create_ml_tab(), "🧠 ML Model")
-
-        # Tab 5: Notifications
-        tabs.addTab(self.create_notifications_tab(), "📧 Notifications")
-
-        # Tab 6: Settings
-        tabs.addTab(self.create_settings_tab(), "⚙️ Settings")
+        tabs.addTab(self.create_dashboard_tab(), "Dashboard")
+        tabs.addTab(self.create_threats_tab(), "Threats")
+        tabs.addTab(self.create_stats_tab(), "Statistics")
+        tabs.addTab(self.create_ml_tab(), "ML Model")
+        tabs.addTab(self.create_notifications_tab(), "Notifications")
+        tabs.addTab(self.create_settings_tab(), "Settings")
 
         main_layout.addWidget(tabs)
 
@@ -185,24 +198,36 @@ class MainWindow(QMainWindow):
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setMaximumWidth(200)
+        self.progress_bar.setMaximumHeight(14)
         self.progress_bar.setVisible(False)
         self.status_bar.addPermanentWidget(self.progress_bar)
 
         central_widget.setLayout(main_layout)
 
+    @staticmethod
+    def _section_header(text):
+        """Create a consistently styled section header label."""
+        label = QLabel(text)
+        label.setProperty("role", "sectionHeader")
+        return label
+
     def create_dashboard_tab(self):
         """Create dashboard tab"""
         widget = QWidget()
         layout = QVBoxLayout()
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(16)
 
         # Threat summary
+        layout.addWidget(self._section_header("Threat Summary"))
         summary_layout = QHBoxLayout()
+        summary_layout.setSpacing(12)
 
-        self.total_threats_label = self.create_stat_box("Total Threats", "0", QColor(100, 100, 150))
-        self.critical_label = self.create_stat_box("🔴 Critical", "0", QColor(220, 50, 50))
-        self.high_label = self.create_stat_box("🟠 High", "0", QColor(220, 150, 50))
-        self.medium_label = self.create_stat_box("🟡 Medium", "0", QColor(220, 200, 50))
-        self.low_label = self.create_stat_box("🟢 Low", "0", QColor(100, 200, 100))
+        self.total_threats_label = self.create_stat_box("Total Threats", "0", QColor(Palette.ACCENT))
+        self.critical_label = self.create_stat_box("Critical", "0", QColor(Palette.CRITICAL))
+        self.high_label = self.create_stat_box("High", "0", QColor(Palette.HIGH))
+        self.medium_label = self.create_stat_box("Medium", "0", QColor(Palette.MEDIUM))
+        self.low_label = self.create_stat_box("Low", "0", QColor(Palette.LOW))
 
         summary_layout.addWidget(self.total_threats_label)
         summary_layout.addWidget(self.critical_label)
@@ -213,11 +238,13 @@ class MainWindow(QMainWindow):
         layout.addLayout(summary_layout)
 
         # System metrics
+        layout.addWidget(self._section_header("System Metrics"))
         metrics_layout = QHBoxLayout()
+        metrics_layout.setSpacing(12)
 
-        self.cpu_label = self.create_stat_box("CPU", "0%", QColor(100, 150, 200))
-        self.memory_label = self.create_stat_box("Memory", "0%", QColor(150, 100, 200))
-        self.disk_label = self.create_stat_box("Disk", "0%", QColor(200, 150, 100))
+        self.cpu_label = self.create_stat_box("CPU", "0%", QColor(Palette.LOW))
+        self.memory_label = self.create_stat_box("Memory", "0%", QColor(Palette.ACCENT))
+        self.disk_label = self.create_stat_box("Disk", "0%", QColor(Palette.MEDIUM))
 
         metrics_layout.addWidget(self.cpu_label)
         metrics_layout.addWidget(self.memory_label)
@@ -227,13 +254,18 @@ class MainWindow(QMainWindow):
         layout.addLayout(metrics_layout)
 
         # Recent threats table
-        layout.addWidget(QLabel("Recent Threats"))
+        layout.addWidget(self._section_header("Recent Threats"))
         self.recent_threats_table = QTableWidget()
         self.recent_threats_table.setColumnCount(6)
         self.recent_threats_table.setHorizontalHeaderLabels([
             "Name", "Severity", "Risk Score", "Category", "Time", "Status"
         ])
         self.recent_threats_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.recent_threats_table.verticalHeader().setVisible(False)
+        self.recent_threats_table.setAlternatingRowColors(True)
+        self.recent_threats_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.recent_threats_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.recent_threats_table.verticalHeader().setDefaultSectionSize(30)
         layout.addWidget(self.recent_threats_table)
 
         widget.setLayout(layout)
@@ -243,17 +275,20 @@ class MainWindow(QMainWindow):
         """Create threats list tab"""
         widget = QWidget()
         layout = QVBoxLayout()
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
 
         # Filter bar
         filter_layout = QHBoxLayout()
-        filter_layout.addWidget(QLabel("Filter:"))
+        filter_layout.setSpacing(8)
+        filter_layout.addWidget(QLabel("Severity:"))
 
         self.severity_filter = QComboBox()
         self.severity_filter.addItems(["All", "Critical", "High", "Medium", "Low"])
         self.severity_filter.currentTextChanged.connect(self.refresh_threats_table)
         filter_layout.addWidget(self.severity_filter)
 
-        filter_layout.addWidget(QLabel("Hours:"))
+        filter_layout.addWidget(QLabel("Window (hours):"))
         self.hours_spin = QSpinBox()
         self.hours_spin.setValue(24)
         self.hours_spin.setMaximum(168)
@@ -261,6 +296,9 @@ class MainWindow(QMainWindow):
         filter_layout.addWidget(self.hours_spin)
 
         filter_layout.addStretch()
+        caption = QLabel("Double-click a row for full advisory details")
+        caption.setProperty("role", "caption")
+        filter_layout.addWidget(caption)
 
         layout.addLayout(filter_layout)
 
@@ -272,6 +310,11 @@ class MainWindow(QMainWindow):
         ])
         self.threats_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.threats_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.threats_table.verticalHeader().setVisible(False)
+        self.threats_table.setAlternatingRowColors(True)
+        self.threats_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.threats_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.threats_table.verticalHeader().setDefaultSectionSize(30)
         self.threats_table.doubleClicked.connect(self.show_threat_details)
 
         layout.addWidget(self.threats_table)
@@ -283,9 +326,13 @@ class MainWindow(QMainWindow):
         """Create statistics tab"""
         widget = QWidget()
         layout = QVBoxLayout()
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(16)
 
         # Stats grid
+        layout.addWidget(self._section_header("Key Metrics"))
         stats_layout = QGridLayout()
+        stats_layout.setSpacing(12)
 
         stats_grid = [
             ("Total Threats (24h)", "0"),
@@ -300,15 +347,18 @@ class MainWindow(QMainWindow):
         for idx, (label, value) in enumerate(stats_grid):
             row = idx // 3
             col = idx % 3
-            stat_widget = self.create_stat_box(label, value, QColor(100, 120, 150))
+            stat_widget = self.create_stat_box(label, value, QColor(Palette.ACCENT))
             stats_layout.addWidget(stat_widget, row, col)
             self.stat_labels[label] = stat_widget
 
         layout.addLayout(stats_layout)
 
         # Timeline
-        layout.addWidget(QLabel("Threat Timeline (24h)"))
+        layout.addWidget(self._section_header("Threat Timeline (24h)"))
         self.timeline_chart = QChartView()
+        self.timeline_chart.setStyleSheet(
+            f"background-color: {Palette.BG_SURFACE_ALT}; border: 1px solid {Palette.BORDER}; border-radius: 8px;"
+        )
         layout.addWidget(self.timeline_chart)
 
         widget.setLayout(layout)
@@ -318,13 +368,17 @@ class MainWindow(QMainWindow):
         """Create ML model tab"""
         widget = QWidget()
         layout = QVBoxLayout()
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(16)
 
         # Model status
+        layout.addWidget(self._section_header("Model Status"))
         status_layout = QHBoxLayout()
+        status_layout.setSpacing(12)
 
-        self.ml_trained_label = self.create_stat_box("Status", "Not Trained", QColor(150, 100, 100))
-        self.ml_samples_label = self.create_stat_box("Samples", "0", QColor(100, 150, 100))
-        self.ml_accuracy_label = self.create_stat_box("Last Accuracy", "N/A", QColor(100, 100, 150))
+        self.ml_trained_label = self.create_stat_box("Status", "Not Trained", QColor(Palette.MEDIUM))
+        self.ml_samples_label = self.create_stat_box("Samples", "0", QColor(Palette.LOW))
+        self.ml_accuracy_label = self.create_stat_box("Last Accuracy", "N/A", QColor(Palette.ACCENT))
 
         status_layout.addWidget(self.ml_trained_label)
         status_layout.addWidget(self.ml_samples_label)
@@ -335,7 +389,10 @@ class MainWindow(QMainWindow):
 
         # Model info
         info_group = QFrame()
+        info_group.setObjectName("formGroup")
         info_layout = QFormLayout()
+        info_layout.setContentsMargins(16, 14, 16, 14)
+        info_layout.setSpacing(10)
 
         self.model_path_label = QLabel("Not loaded")
         self.model_features_label = QLabel("0")
@@ -346,23 +403,28 @@ class MainWindow(QMainWindow):
         info_layout.addRow("Model Version:", self.model_version_label)
 
         info_group.setLayout(info_layout)
-        layout.addWidget(QLabel("Model Information"))
+        layout.addWidget(self._section_header("Model Information"))
         layout.addWidget(info_group)
 
         # Training info
-        layout.addWidget(QLabel("Recent Training"))
+        layout.addWidget(self._section_header("Recent Training"))
         self.training_info_list = QListWidget()
         layout.addWidget(self.training_info_list)
 
         # Controls
         control_layout = QHBoxLayout()
+        control_layout.setSpacing(8)
         control_layout.addStretch()
 
-        reload_button = QPushButton("Reload Model")
+        style = self.style()
+        reload_button = QPushButton(" Reload Model")
+        reload_button.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
         reload_button.clicked.connect(self.reload_ml_model)
         control_layout.addWidget(reload_button)
 
-        retrain_button = QPushButton("Retrain Model")
+        retrain_button = QPushButton(" Retrain Model")
+        retrain_button.setObjectName("primaryButton")
+        retrain_button.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
         retrain_button.clicked.connect(self.train_ml_model)
         control_layout.addWidget(retrain_button)
 
@@ -376,12 +438,16 @@ class MainWindow(QMainWindow):
         """Create notifications tab"""
         widget = QWidget()
         layout = QVBoxLayout()
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(16)
 
         # Notification status
+        layout.addWidget(self._section_header("Notification Status"))
         status_layout = QHBoxLayout()
+        status_layout.setSpacing(12)
 
-        self.notif_enabled_label = self.create_stat_box("Status", "Disabled", QColor(150, 100, 100))
-        self.notif_recipients_label = self.create_stat_box("Recipients", "0", QColor(100, 150, 100))
+        self.notif_enabled_label = self.create_stat_box("Status", "Disabled", QColor(Palette.TEXT_MUTED))
+        self.notif_recipients_label = self.create_stat_box("Recipients", "0", QColor(Palette.ACCENT))
 
         status_layout.addWidget(self.notif_enabled_label)
         status_layout.addWidget(self.notif_recipients_label)
@@ -390,24 +456,28 @@ class MainWindow(QMainWindow):
         layout.addLayout(status_layout)
 
         # Recipients list
-        layout.addWidget(QLabel("Email Recipients"))
+        layout.addWidget(self._section_header("Email Recipients"))
         self.recipients_list = QListWidget()
         layout.addWidget(self.recipients_list)
 
         # Add recipient
         add_layout = QHBoxLayout()
+        add_layout.setSpacing(8)
         self.recipient_input = QLineEdit()
         self.recipient_input.setPlaceholderText("Enter email address...")
-        add_button = QPushButton("Add")
+        add_button = QPushButton(" Add")
+        add_button.setObjectName("primaryButton")
+        add_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogApplyButton))
         add_button.clicked.connect(self.add_recipient)
         add_layout.addWidget(self.recipient_input)
         add_layout.addWidget(add_button)
         layout.addLayout(add_layout)
 
         # Test notification
-        layout.addWidget(QLabel("Test"))
+        layout.addWidget(self._section_header("Test"))
         test_layout = QHBoxLayout()
-        test_button = QPushButton("Send Test Notification")
+        test_button = QPushButton(" Send Test Notification")
+        test_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxInformation))
         test_button.clicked.connect(self.send_test_notification)
         test_layout.addWidget(test_button)
         test_layout.addStretch()
@@ -422,19 +492,24 @@ class MainWindow(QMainWindow):
         """Create settings tab"""
         widget = QWidget()
         layout = QVBoxLayout()
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(16)
 
         # Application settings
-        layout.addWidget(QLabel("Application Settings"))
+        layout.addWidget(self._section_header("Application Settings"))
 
         settings_group = QFrame()
+        settings_group.setObjectName("formGroup")
         settings_layout = QFormLayout()
+        settings_layout.setContentsMargins(16, 14, 16, 14)
+        settings_layout.setSpacing(10)
 
         auto_refresh_combo = QComboBox()
         auto_refresh_combo.addItems(["5 seconds", "10 seconds", "30 seconds", "1 minute"])
         settings_layout.addRow("Refresh Interval:", auto_refresh_combo)
 
         theme_combo = QComboBox()
-        theme_combo.addItems(["Light", "Dark"])
+        theme_combo.addItems(["Dark", "Light"])
         settings_layout.addRow("Theme:", theme_combo)
 
         alert_sound_combo = QComboBox()
@@ -445,20 +520,29 @@ class MainWindow(QMainWindow):
         layout.addWidget(settings_group)
 
         # Database
-        layout.addWidget(QLabel("Database"))
+        layout.addWidget(self._section_header("Database"))
+        db_group = QFrame()
+        db_group.setObjectName("formGroup")
         db_layout = QHBoxLayout()
+        db_layout.setContentsMargins(16, 12, 16, 12)
         db_path_label = QLabel(self.config.get('database.path', 'data/db/threats.db'))
-        vacuum_button = QPushButton("Optimize")
+        db_path_label.setProperty("role", "caption")
+        vacuum_button = QPushButton(" Optimize")
+        vacuum_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DriveHDIcon))
         vacuum_button.clicked.connect(self.optimize_database)
         db_layout.addWidget(db_path_label)
         db_layout.addStretch()
         db_layout.addWidget(vacuum_button)
-        layout.addLayout(db_layout)
+        db_group.setLayout(db_layout)
+        layout.addWidget(db_group)
 
         # About
-        layout.addWidget(QLabel("About"))
+        layout.addWidget(self._section_header("About"))
         about_group = QFrame()
+        about_group.setObjectName("formGroup")
         about_layout = QFormLayout()
+        about_layout.setContentsMargins(16, 14, 16, 14)
+        about_layout.setSpacing(10)
         about_layout.addRow("Application:", QLabel("SecureX Threat Advisor"))
         about_layout.addRow("Version:", QLabel("v1.2.0"))
         about_layout.addRow("Status:", QLabel("Production Ready"))
@@ -471,32 +555,30 @@ class MainWindow(QMainWindow):
         return widget
 
     def create_stat_box(self, title, value, color):
-        """Create a styled stat box"""
+        """Create a styled stat card with a colored accent bar, title and value."""
         box = QFrame()
-        box.setStyleSheet(f"""
-            QFrame {{
-                border: 2px solid {color.name()};
-                border-radius: 8px;
-                background-color: rgba({color.red()}, {color.green()}, {color.blue()}, 20);
-                padding: 10px;
+        box.setObjectName("statCard")
+        box.setMinimumHeight(84)
+        box.setStyleSheet(box.styleSheet() + f"""
+            QFrame#statCard {{
+                border-top: 3px solid {color.name()};
             }}
         """)
 
         layout = QVBoxLayout()
-        title_label = QLabel(title)
-        title_font = QFont()
-        title_font.setPointSize(9)
-        title_label.setFont(title_font)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(6)
+
+        title_label = QLabel(title.upper())
+        title_label.setProperty("role", "statTitle")
 
         value_label = QLabel(value)
-        value_font = QFont()
-        value_font.setPointSize(14)
-        value_font.setBold(True)
-        value_label.setFont(value_font)
-        value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        value_label.setProperty("role", "statValue")
+        value_label.setStyleSheet(f"color: {color.name()};")
 
         layout.addWidget(title_label)
         layout.addWidget(value_label)
+        layout.addStretch()
         box.setLayout(layout)
 
         # Store reference for updates
@@ -581,7 +663,11 @@ class MainWindow(QMainWindow):
 
             for row, threat in enumerate(threats):
                 self.recent_threats_table.setItem(row, 0, QTableWidgetItem(threat.get('threat_name', '')))
-                self.recent_threats_table.setItem(row, 1, QTableWidgetItem(str(threat.get('severity', '')).title()))
+
+                severity = str(threat.get('severity', ''))
+                severity_item = QTableWidgetItem(severity.title())
+                severity_item.setForeground(QBrush(Palette.severity_color(severity)))
+                self.recent_threats_table.setItem(row, 1, severity_item)
 
                 risk_score = threat.get('risk_score', 0)
                 self.recent_threats_table.setItem(row, 2, QTableWidgetItem(f"{risk_score:.2f}"))
@@ -607,7 +693,11 @@ class MainWindow(QMainWindow):
             for row, threat in enumerate(threats):
                 self.threats_table.setItem(row, 0, QTableWidgetItem(str(threat.get('id', ''))))
                 self.threats_table.setItem(row, 1, QTableWidgetItem(threat.get('threat_name', '')))
-                self.threats_table.setItem(row, 2, QTableWidgetItem(str(threat.get('severity', '')).title()))
+
+                severity = str(threat.get('severity', ''))
+                severity_item = QTableWidgetItem(severity.title())
+                severity_item.setForeground(QBrush(Palette.severity_color(severity)))
+                self.threats_table.setItem(row, 2, severity_item)
 
                 risk_score = threat.get('risk_score', 0)
                 self.threats_table.setItem(row, 3, QTableWidgetItem(f"{risk_score:.2f}"))
@@ -766,6 +856,8 @@ def main():
     try:
         from PyQt6.QtWidgets import QApplication
         app = QApplication(sys.argv)
+        app.setStyle("Fusion")
+        app.setFont(QFont("Segoe UI", 9))
 
         window = MainWindow()
         window.show()
