@@ -27,13 +27,23 @@ CREATE TABLE IF NOT EXISTS threats (
     category TEXT NOT NULL,
     risk_level TEXT NOT NULL,
     risk_score REAL NOT NULL,
-    severity REAL,
+    severity TEXT,
     confidence REAL,
     source TEXT,
     description TEXT,
     detected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status TEXT DEFAULT 'active',
     FOREIGN KEY (device_id) REFERENCES devices(id)
+);
+
+CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT,
+    source TEXT,
+    event_data TEXT,
+    severity TEXT DEFAULT 'info',
+    processed BOOLEAN DEFAULT 0,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS threat_logs (
@@ -144,3 +154,7 @@ CREATE INDEX IF NOT EXISTS idx_threats_risk_level ON threats(risk_level);
 CREATE INDEX IF NOT EXISTS idx_scan_history_device ON scan_history(device_id);
 CREATE INDEX IF NOT EXISTS idx_network_logs_device ON network_logs(device_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_device ON notifications(device_id);
+CREATE INDEX IF NOT EXISTS idx_threats_severity ON threats(severity);
+CREATE INDEX IF NOT EXISTS idx_threats_category ON threats(category);
+CREATE INDEX IF NOT EXISTS idx_advisories_threat_id ON advisories(threat_id);
+CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);

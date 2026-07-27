@@ -61,16 +61,28 @@ class DatabaseManager:
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS threats (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    device_id INTEGER,
                     threat_name TEXT NOT NULL,
                     category TEXT NOT NULL,
                     risk_level TEXT NOT NULL,
                     risk_score REAL NOT NULL,
-                    severity REAL,
+                    severity TEXT,
                     confidence REAL,
                     source TEXT,
                     description TEXT,
                     detected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     status TEXT DEFAULT 'active'
+                )
+            ''')
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_type TEXT,
+                    source TEXT,
+                    event_data TEXT,
+                    severity TEXT DEFAULT 'info',
+                    processed BOOLEAN DEFAULT 0,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             cursor.execute('''
@@ -120,12 +132,10 @@ class DatabaseManager:
         
         cursor.execute('''
             INSERT INTO threats (
-                timestamp, threat_id, threat_name, category, severity,
-                risk_level, risk_score, confidence, source, description, details
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                threat_name, category, severity,
+                risk_level, risk_score, confidence, source, description
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            threat_data.get('timestamp'),
-            threat_data.get('threat_id'),
             threat_data.get('threat_name'),
             threat_data.get('category'),
             threat_data.get('severity'),
@@ -133,8 +143,7 @@ class DatabaseManager:
             threat_data.get('risk_score'),
             threat_data.get('confidence'),
             threat_data.get('source', 'Unknown'),
-            threat_data.get('description', ''),
-            json.dumps(threat_data.get('details', {}))
+            threat_data.get('description', '')
         ))
         
         threat_id = cursor.lastrowid
@@ -228,8 +237,8 @@ class DatabaseManager:
         
         cursor.execute('''
             SELECT * FROM threats
-            WHERE timestamp > ?
-            ORDER BY timestamp DESC
+            WHERE detected_at > ?
+            ORDER BY detected_at DESC
             LIMIT ?
         ''', (time_threshold, limit))
         
@@ -302,31 +311,31 @@ class DatabaseManager:
         time_threshold = (datetime.now() - timedelta(hours=hours)).isoformat()
         
         # Total threats
-        cursor.execute('SELECT COUNT(*) FROM threats WHERE timestamp > ?', (time_threshold,))
+        cursor.execute('SELECT COUNT(*) FROM threats WHERE detected_at > ?', (time_threshold,))
         total_threats = cursor.fetchone()[0]
-        
+
         # Threats by severity
         cursor.execute('''
             SELECT severity, COUNT(*) as count
             FROM threats
-            WHERE timestamp > ?
+            WHERE detected_at > ?
             GROUP BY severity
         ''', (time_threshold,))
         by_severity = dict(cursor.fetchall())
-        
+
         # Threats by category
         cursor.execute('''
             SELECT category, COUNT(*) as count
             FROM threats
-            WHERE timestamp > ?
+            WHERE detected_at > ?
             GROUP BY category
         ''', (time_threshold,))
         by_category = dict(cursor.fetchall())
-        
+
         # Active threats (high severity)
         cursor.execute('''
             SELECT COUNT(*) FROM threats
-            WHERE timestamp > ? AND severity = 'high' AND status = 'active'
+            WHERE detected_at > ? AND severity = 'high' AND status = 'active'
         ''', (time_threshold,))
         active_critical = cursor.fetchone()[0]
         
@@ -371,7 +380,7 @@ class DatabaseManager:
         
         time_threshold = (datetime.now() - timedelta(days=days)).isoformat()
         
-        cursor.execute('DELETE FROM threats WHERE timestamp < ?', (time_threshold,))
+        cursor.execute('DELETE FROM threats WHERE detected_at < ?', (time_threshold,))
         cursor.execute('DELETE FROM events WHERE timestamp < ?', (time_threshold,))
         
         deleted_threats = cursor.rowcount
