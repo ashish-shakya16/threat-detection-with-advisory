@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ShieldAlert, LineChart, Bot, Settings, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, ShieldAlert, LineChart, Bot, Settings } from 'lucide-react';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
 import { cn } from '@/lib/utils';
 
@@ -15,8 +15,8 @@ export function Sidebar() {
   return (
     <nav className="fixed left-0 top-0 flex h-screen w-64 flex-col border-r bg-card">
       <div className="flex items-center gap-3 border-b p-6">
-        <ShieldCheck className="h-8 w-8 text-primary" />
-        <h2 className="text-lg font-bold">CyberGuard</h2>
+        <img src="/favicon.svg" alt="" className="h-8 w-8" />
+        <h2 className="text-lg font-bold">SecureX</h2>
       </div>
 
       <ul className="flex-1 space-y-1 p-4">

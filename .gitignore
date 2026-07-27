@@ -88,6 +88,9 @@ desktop.ini
 coverage/
 .playwright-mcp/
 
+# Frontend build output
+frontend/dist/
+
 # Keep directory structure but ignore contents
 !data/db/.gitkeep
 !data/logs/.gitkeep
