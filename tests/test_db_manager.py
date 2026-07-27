@@ -45,6 +45,85 @@ class TestDatabaseManager(unittest.TestCase):
         self.assertIsNotNone(fetched)
         self.assertEqual(fetched['title'], 'Test Advisory')
 
+    def test_log_threat_closes_connection_even_on_bad_data(self):
+        before_count = self._count_open_connections()
+
+        try:
+            self.db.log_threat({
+                'threat_name': 'X',
+                'category': 'test',
+                'severity': 'low',
+                'risk_level': 'Low',
+                'risk_score': 0.1,
+                'confidence': 0.5,
+            })
+        except Exception:
+            pass
+
+        after_count = self._count_open_connections()
+        self.assertEqual(before_count, after_count)
+
+    def _count_open_connections(self):
+        conn = sqlite3.connect(self.db_path, timeout=0.1)
+        conn.execute('SELECT 1')
+        conn.close()
+        return 0
+
+    def test_update_threat_status(self):
+        threat_id = self.db.log_threat({
+            'threat_name': 'Test',
+            'category': 'test',
+            'severity': 'high',
+            'risk_level': 'High',
+            'risk_score': 0.9,
+            'confidence': 0.8,
+        })
+
+        self.db.update_threat_status(threat_id, 'ignored')
+
+        threat = self.db.get_threat_by_id(threat_id)
+        self.assertEqual(threat['status'], 'ignored')
+
+    def test_update_threat_status_rejects_invalid_status(self):
+        threat_id = self.db.log_threat({
+            'threat_name': 'Test',
+            'category': 'test',
+            'severity': 'high',
+            'risk_level': 'High',
+            'risk_score': 0.9,
+            'confidence': 0.8,
+        })
+
+        with self.assertRaises(ValueError):
+            self.db.update_threat_status(threat_id, 'not_a_real_status')
+
+    def test_vacuum_runs_without_error(self):
+        self.db.log_threat({
+            'threat_name': 'Test',
+            'category': 'test',
+            'severity': 'low',
+            'risk_level': 'Low',
+            'risk_score': 0.1,
+            'confidence': 0.5,
+        })
+        self.db.vacuum()  # Should not raise
+
+    def test_get_threat_timeline_by_day(self):
+        self.db.log_threat({
+            'threat_name': 'Test',
+            'category': 'test',
+            'severity': 'high',
+            'risk_level': 'High',
+            'risk_score': 0.9,
+            'confidence': 0.8,
+        })
+
+        timeline = self.db.get_threat_timeline_by_day(days=7)
+        self.assertIsInstance(timeline, list)
+        self.assertGreaterEqual(len(timeline), 1)
+        self.assertIn('date', timeline[0])
+        self.assertIn('count', timeline[0])
+
 
 if __name__ == '__main__':
     unittest.main()

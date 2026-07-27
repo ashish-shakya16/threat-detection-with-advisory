@@ -118,72 +118,74 @@ class DatabaseManager:
     def log_threat(self, threat_data: Dict[str, Any]) -> int:
         """
         Log a detected threat to the database.
-        
+
         Args:
             threat_data: Dictionary containing threat information
-                Required keys: timestamp, threat_id, threat_name, category, 
-                              severity, risk_level, risk_score, confidence
-        
+                Required keys: threat_name, category, severity, risk_level,
+                              risk_score, confidence
+
         Returns:
             ID of the inserted threat record
         """
         conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            INSERT INTO threats (
-                threat_name, category, severity,
-                risk_level, risk_score, confidence, source, description
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            threat_data.get('threat_name'),
-            threat_data.get('category'),
-            threat_data.get('severity'),
-            threat_data.get('risk_level'),
-            threat_data.get('risk_score'),
-            threat_data.get('confidence'),
-            threat_data.get('source', 'Unknown'),
-            threat_data.get('description', '')
-        ))
-        
-        threat_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        
-        self.logger.info(f"Logged threat: {threat_data.get('threat_name')} (ID: {threat_id})")
-        return threat_id
-    
+        try:
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                INSERT INTO threats (
+                    threat_name, category, severity,
+                    risk_level, risk_score, confidence, source, description
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                threat_data.get('threat_name'),
+                threat_data.get('category'),
+                threat_data.get('severity'),
+                threat_data.get('risk_level'),
+                threat_data.get('risk_score'),
+                threat_data.get('confidence'),
+                threat_data.get('source', 'Unknown'),
+                threat_data.get('description', '')
+            ))
+
+            threat_id = cursor.lastrowid
+            conn.commit()
+            self.logger.info(f"Logged threat: {threat_data.get('threat_name')} (ID: {threat_id})")
+            return threat_id
+        finally:
+            conn.close()
+
     def log_event(self, event_data: Dict[str, Any]) -> int:
         """
         Log a monitoring event to the database.
-        
+
         Args:
             event_data: Dictionary containing event information
-        
+
         Returns:
             ID of the inserted event record
         """
         conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            INSERT INTO events (
-                timestamp, event_type, source, event_data, severity, processed
-            ) VALUES (?, ?, ?, ?, ?, ?)
-        ''', (
-            event_data.get('timestamp'),
-            event_data.get('event_type'),
-            event_data.get('source'),
-            json.dumps(event_data.get('data', {})),
-            event_data.get('severity', 'info'),
-            0
-        ))
-        
-        event_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        
-        return event_id
+        try:
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                INSERT INTO events (
+                    timestamp, event_type, source, event_data, severity, processed
+                ) VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                event_data.get('timestamp'),
+                event_data.get('event_type'),
+                event_data.get('source'),
+                json.dumps(event_data.get('data', {})),
+                event_data.get('severity', 'info'),
+                0
+            ))
+
+            event_id = cursor.lastrowid
+            conn.commit()
+            return event_id
+        finally:
+            conn.close()
     
     def log_advisory(self, threat_id: int, advisory_data: Dict[str, Any]) -> int:
         """
@@ -223,170 +225,222 @@ class DatabaseManager:
     def get_recent_threats(self, limit: int = 50, hours: int = 24) -> List[Dict[str, Any]]:
         """
         Get recent threats from the database.
-        
+
         Args:
             limit: Maximum number of threats to return
             hours: Time window in hours
-        
+
         Returns:
             List of threat dictionaries
         """
         conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        time_threshold = (datetime.now() - timedelta(hours=hours)).isoformat()
-        
-        cursor.execute('''
-            SELECT * FROM threats
-            WHERE detected_at > ?
-            ORDER BY detected_at DESC
-            LIMIT ?
-        ''', (time_threshold, limit))
-        
-        threats = [dict(row) for row in cursor.fetchall()]
-        conn.close()
-        
-        return threats
-    
+        try:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            time_threshold = (datetime.now() - timedelta(hours=hours)).isoformat()
+
+            cursor.execute('''
+                SELECT * FROM threats
+                WHERE detected_at > ?
+                ORDER BY detected_at DESC
+                LIMIT ?
+            ''', (time_threshold, limit))
+
+            return [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
+
     def get_threat_by_id(self, threat_id: int) -> Optional[Dict[str, Any]]:
         """
         Get specific threat by ID.
-        
+
         Args:
             threat_id: Threat ID
-        
+
         Returns:
             Threat dictionary or None
         """
         conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        cursor.execute('SELECT * FROM threats WHERE id = ?', (threat_id,))
-        row = cursor.fetchone()
-        
-        conn.close()
-        
-        return dict(row) if row else None
-    
+        try:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            cursor.execute('SELECT * FROM threats WHERE id = ?', (threat_id,))
+            row = cursor.fetchone()
+
+            return dict(row) if row else None
+        finally:
+            conn.close()
+
     def get_advisory_for_threat(self, threat_id: int) -> Optional[Dict[str, Any]]:
         """
         Get advisory for a specific threat.
-        
+
         Args:
             threat_id: Threat ID
-        
+
         Returns:
             Advisory dictionary or None
         """
         conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        cursor.execute('SELECT * FROM advisories WHERE threat_id = ?', (threat_id,))
-        row = cursor.fetchone()
-        
-        conn.close()
-        
-        if row:
-            advisory = dict(row)
-            # Handle reference_links field
-            if 'reference_links' in advisory and advisory['reference_links']:
-                advisory['reference_links'] = advisory['reference_links']
-            return advisory
-        return None
-    
+        try:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            cursor.execute('SELECT * FROM advisories WHERE threat_id = ?', (threat_id,))
+            row = cursor.fetchone()
+
+            return dict(row) if row else None
+        finally:
+            conn.close()
+
     def get_threat_statistics(self, hours: int = 24) -> Dict[str, Any]:
         """
         Get threat statistics for dashboard.
-        
+
         Args:
             hours: Time window in hours
-        
+
         Returns:
             Dictionary with statistics
         """
         conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        time_threshold = (datetime.now() - timedelta(hours=hours)).isoformat()
-        
-        # Total threats
-        cursor.execute('SELECT COUNT(*) FROM threats WHERE detected_at > ?', (time_threshold,))
-        total_threats = cursor.fetchone()[0]
+        try:
+            cursor = conn.cursor()
 
-        # Threats by severity
-        cursor.execute('''
-            SELECT severity, COUNT(*) as count
-            FROM threats
-            WHERE detected_at > ?
-            GROUP BY severity
-        ''', (time_threshold,))
-        by_severity = dict(cursor.fetchall())
+            time_threshold = (datetime.now() - timedelta(hours=hours)).isoformat()
 
-        # Threats by category
-        cursor.execute('''
-            SELECT category, COUNT(*) as count
-            FROM threats
-            WHERE detected_at > ?
-            GROUP BY category
-        ''', (time_threshold,))
-        by_category = dict(cursor.fetchall())
+            cursor.execute('SELECT COUNT(*) FROM threats WHERE detected_at > ?', (time_threshold,))
+            total_threats = cursor.fetchone()[0]
 
-        # Active threats (high severity)
-        cursor.execute('''
-            SELECT COUNT(*) FROM threats
-            WHERE detected_at > ? AND severity = 'high' AND status = 'active'
-        ''', (time_threshold,))
-        active_critical = cursor.fetchone()[0]
-        
-        conn.close()
-        
-        return {
-            'total_threats': total_threats,
-            'by_severity': by_severity,
-            'by_category': by_category,
-            'active_critical': active_critical,
-            'time_window_hours': hours
-        }
-    
+            cursor.execute('''
+                SELECT severity, COUNT(*) as count
+                FROM threats
+                WHERE detected_at > ?
+                GROUP BY severity
+            ''', (time_threshold,))
+            by_severity = dict(cursor.fetchall())
+
+            cursor.execute('''
+                SELECT category, COUNT(*) as count
+                FROM threats
+                WHERE detected_at > ?
+                GROUP BY category
+            ''', (time_threshold,))
+            by_category = dict(cursor.fetchall())
+
+            cursor.execute('''
+                SELECT COUNT(*) FROM threats
+                WHERE detected_at > ? AND severity IN ('high', 'critical') AND status = 'active'
+            ''', (time_threshold,))
+            active_critical = cursor.fetchone()[0]
+
+            return {
+                'total_threats': total_threats,
+                'by_severity': by_severity,
+                'by_category': by_category,
+                'active_critical': active_critical,
+                'time_window_hours': hours
+            }
+        finally:
+            conn.close()
+
+    def get_threat_timeline_by_day(self, days: int = 7) -> List[Dict[str, Any]]:
+        """
+        Get daily threat counts for the past N days, for analytics charts.
+
+        Args:
+            days: Number of days to look back
+
+        Returns:
+            List of {'date': 'YYYY-MM-DD', 'count': int} dictionaries, oldest first
+        """
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cursor = conn.cursor()
+            time_threshold = (datetime.now() - timedelta(days=days)).isoformat()
+
+            cursor.execute('''
+                SELECT date(detected_at) as day, COUNT(*) as count
+                FROM threats
+                WHERE detected_at > ?
+                GROUP BY day
+                ORDER BY day ASC
+            ''', (time_threshold,))
+
+            return [{'date': row[0], 'count': row[1]} for row in cursor.fetchall()]
+        finally:
+            conn.close()
+
     def mark_threat_resolved(self, threat_id: int):
         """
         Mark a threat as resolved.
-        
+
         Args:
             threat_id: Threat ID to mark as resolved
         """
         conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            UPDATE threats SET status = 'resolved' WHERE id = ?
-        ''', (threat_id,))
-        
-        conn.commit()
-        conn.close()
-        
-        self.logger.info(f"Threat {threat_id} marked as resolved")
-    
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE threats SET status = 'resolved' WHERE id = ?
+            ''', (threat_id,))
+            conn.commit()
+            self.logger.info(f"Threat {threat_id} marked as resolved")
+        finally:
+            conn.close()
+
+    def update_threat_status(self, threat_id: int, status: str):
+        """
+        Update a threat's status to any valid value.
+
+        Args:
+            threat_id: Threat ID to update
+            status: New status ('active', 'resolved', 'ignored', 'escalated')
+
+        Raises:
+            ValueError: If status is not one of the valid values
+        """
+        valid_statuses = {'active', 'resolved', 'ignored', 'escalated'}
+        if status not in valid_statuses:
+            raise ValueError(f"Invalid status '{status}'. Must be one of: {valid_statuses}")
+
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE threats SET status = ? WHERE id = ?', (status, threat_id))
+            conn.commit()
+            self.logger.info(f"Threat {threat_id} status updated to {status}")
+        finally:
+            conn.close()
+
+    def vacuum(self):
+        """Reclaim unused space and defragment the database file."""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            conn.execute('VACUUM')
+            self.logger.info("Database vacuumed")
+        finally:
+            conn.close()
+
     def cleanup_old_logs(self, days: int = 30):
         """
         Delete old threat logs.
-        
+
         Args:
             days: Delete logs older than this many days
         """
         conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        time_threshold = (datetime.now() - timedelta(days=days)).isoformat()
-        
-        cursor.execute('DELETE FROM threats WHERE detected_at < ?', (time_threshold,))
-        cursor.execute('DELETE FROM events WHERE timestamp < ?', (time_threshold,))
-        
-        deleted_threats = cursor.rowcount
-        conn.commit()
-        conn.close()
-        
-        self.logger.info(f"Cleaned up {deleted_threats} old threat records")
+        try:
+            cursor = conn.cursor()
+            time_threshold = (datetime.now() - timedelta(days=days)).isoformat()
+
+            cursor.execute('DELETE FROM threats WHERE detected_at < ?', (time_threshold,))
+            deleted_threats = cursor.rowcount
+            cursor.execute('DELETE FROM events WHERE timestamp < ?', (time_threshold,))
+            conn.commit()
+
+            self.logger.info(f"Cleaned up {deleted_threats} old threat records")
+        finally:
+            conn.close()
