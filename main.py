@@ -21,6 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
 from src.utils import Config, Logger, load_rules, ensure_directory
+from src.logging_config import setup_logging
 from src.database import DatabaseManager
 from src.monitors import SystemMonitor, NetworkMonitor
 from src.detection import RuleEngine
@@ -55,9 +56,12 @@ class ThreatAdvisor:
         """
         # Load configuration
         self.config = Config(config_path)
-        
+
         # Setup logging
-        self.logger = Logger.setup_logging(self.config)
+        self.logger = setup_logging(
+            log_file=self.config.get('logging.log_file', 'data/logs/app.log'),
+            level=self.config.get('logging.level', 'INFO')
+        )
         self.logger.info("=" * 70)
         self.logger.info("Cybersecurity Threat Advisor Starting...")
         self.logger.info("=" * 70)
