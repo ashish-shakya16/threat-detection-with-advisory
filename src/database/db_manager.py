@@ -540,6 +540,23 @@ class DatabaseManager:
         finally:
             conn.close()
 
+    def get_system_info(self, rules_loaded: int = 0) -> Dict[str, Any]:
+        """
+        Get basic system info for the settings page.
+
+        Args:
+            rules_loaded: Number of detection rules currently loaded (caller-supplied,
+                since DatabaseManager doesn't own rule loading)
+
+        Returns:
+            Dictionary with version, database_type, rules_loaded
+        """
+        return {
+            'version': '1.2.0',
+            'database_type': 'sqlite',
+            'rules_loaded': rules_loaded,
+        }
+
     def cleanup_old_logs(self, days: int = 30):
         """
         Delete old threat logs.

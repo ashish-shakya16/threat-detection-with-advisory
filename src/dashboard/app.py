@@ -9,7 +9,7 @@ import json
 import threading
 import time
 from datetime import datetime, timedelta, timezone
-from flask import Flask, render_template, jsonify, request, session, redirect, url_for
+from flask import Flask, jsonify, request, session, send_from_directory
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 
@@ -50,6 +50,8 @@ app.config['SECRET_KEY'] = secret_key
 allowed_origins = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5000').split(',')
 CORS(app, origins=allowed_origins)
 socketio = SocketIO(app, cors_allowed_origins=allowed_origins)
+
+FRONTEND_DIST = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'frontend', 'dist')
 
 # Global monitoring flag
 monitoring_active = False
@@ -98,61 +100,47 @@ app.register_blueprint(ml_bp)
 
 # ==================== WEB ROUTES ====================
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    """Login page and authentication handler"""
-    if request.method == 'POST':
-        username = request.form.get('username', '')
-        password = request.form.get('password', '')
+@app.route('/api/auth/login', methods=['POST'])
+def api_login():
+    """JSON login endpoint for the SPA"""
+    data = request.get_json() or {}
+    username = data.get('username', '')
+    password = data.get('password', '')
 
-        user = db.get_user_by_username(username)
-        if user and verify_password(user['password_hash'], password):
-            session['username'] = username
-            db.update_last_login(username)
-            next_url = request.args.get('next') or url_for('index')
-            return redirect(next_url)
+    user = db.get_user_by_username(username)
+    if user and verify_password(user['password_hash'], password):
+        session['username'] = username
+        db.update_last_login(username)
+        return jsonify({'success': True, 'data': {'username': username}})
 
-        return render_template('login.html', error='Invalid username or password'), 401
-
-    return render_template('login.html')
+    return jsonify({'success': False, 'error': 'Invalid username or password'}), 401
 
 
-@app.route('/logout', methods=['POST'])
-def logout():
-    """Log the current user out"""
+@app.route('/api/auth/logout', methods=['POST'])
+def api_logout():
+    """JSON logout endpoint for the SPA"""
     session.pop('username', None)
-    return redirect(url_for('login'))
+    return jsonify({'success': True})
 
 
-@app.route('/')
+@app.route('/api/auth/me')
+def api_me():
+    """Return the currently authenticated user, or 401 if not logged in"""
+    if 'username' not in session:
+        return jsonify({'success': False, 'error': 'Authentication required'}), 401
+    return jsonify({'success': True, 'data': {'username': session['username']}})
+
+
+@app.route('/api/system-info')
 @login_required
-def index():
-    """Main dashboard page"""
-    return render_template('dashboard.html')
-
-@app.route('/threats')
-@login_required
-def threats_page():
-    """Threats list page"""
-    return render_template('threats.html')
-
-@app.route('/analytics')
-@login_required
-def analytics_page():
-    """Analytics and reports page"""
-    return render_template('analytics.html')
-
-@app.route('/assistant')
-@login_required
-def assistant_page():
-    """AI Security Assistant page"""
-    return render_template('assistant.html')
-
-@app.route('/settings')
-@login_required
-def settings_page():
-    """Settings and configuration page"""
-    return render_template('settings.html')
+def api_system_info():
+    """Get basic system info for the settings page"""
+    try:
+        info = db.get_system_info(rules_loaded=len(rules_data.get('rules', [])))
+        return jsonify({'success': True, 'data': info})
+    except Exception as e:
+        logger.error(f"Error getting system info: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # ==================== API ENDPOINTS ====================
@@ -511,6 +499,35 @@ def handle_request_update():
         emit('stats_update', stats)
     except Exception as e:
         logger.error(f"Error sending update: {e}")
+
+
+# ==================== SPA STATIC SERVING ====================
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_spa(path):
+    """
+    Serve the built React SPA for any non-API route.
+
+    In development, the frontend runs on its own Vite dev server (port 5173)
+    and this route is never hit for page loads — only used when running the
+    production build through Flask directly.
+    """
+    if path.startswith('api/') or path.startswith('socket.io'):
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+
+    full_path = os.path.join(FRONTEND_DIST, path)
+    if path and os.path.exists(full_path) and os.path.isfile(full_path):
+        return send_from_directory(FRONTEND_DIST, path)
+
+    index_path = os.path.join(FRONTEND_DIST, 'index.html')
+    if not os.path.exists(index_path):
+        return jsonify({
+            'success': False,
+            'error': 'Frontend build not found. Run `npm run build` in the frontend/ directory.'
+        }), 503
+
+    return send_from_directory(FRONTEND_DIST, 'index.html')
 
 
 # ==================== MAIN ====================
