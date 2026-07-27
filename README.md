@@ -123,6 +123,32 @@ python main.py --report
 
 ---
 
+## 🎨 Frontend Development
+
+The web dashboard is a React + TypeScript SPA in `frontend/`, talking to the Flask backend as a pure JSON API.
+
+### Development (hot-reload)
+```bash
+# Terminal 1: backend API
+set SECRET_KEY=<your-secret>
+python src/dashboard/app.py
+
+# Terminal 2: frontend dev server (proxies /api and /socket.io to Flask)
+cd frontend
+npm install
+npm run dev
+```
+Open http://localhost:5173
+
+### Production build
+```bash
+cd frontend
+npm run build
+```
+This outputs static files to `frontend/dist/`, which Flask serves automatically when you run `python src/dashboard/app.py` — no separate frontend server needed in production.
+
+---
+
 ## 📁 Project Structure
 
 ```
