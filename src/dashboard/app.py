@@ -9,7 +9,7 @@ import json
 import threading
 import time
 from datetime import datetime, timedelta, timezone
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 
@@ -24,6 +24,7 @@ from src.detection.rule_engine import RuleEngine
 from src.risk_assessment.risk_scorer import RiskScorer
 from src.advisory.advisor import SecurityAdvisor
 from src.assistant.ai_assistant import AIAssistant
+from src.auth import login_required, verify_password
 from src.dashboard.routes.api_threats import init_threats_routes
 from src.dashboard.routes.api_stats import init_stats_routes
 from src.dashboard.routes.api_analytics import init_analytics_routes
@@ -33,9 +34,22 @@ from src.ml_models.ml_integration import MLIntegration
 
 # Initialize Flask app
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'cybersecurity-threat-advisor-2026'
-CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+
+secret_key = os.environ.get('SECRET_KEY')
+if not secret_key:
+    if os.environ.get('FLASK_ENV') == 'testing' or app.config.get('TESTING'):
+        secret_key = 'test-only-secret-key-not-for-production'
+    else:
+        raise RuntimeError(
+            "SECRET_KEY environment variable is not set. "
+            "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\" "
+            "and set it: set SECRET_KEY=<value> (Windows) or export SECRET_KEY=<value> (Unix)."
+        )
+app.config['SECRET_KEY'] = secret_key
+
+allowed_origins = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5000').split(',')
+CORS(app, origins=allowed_origins)
+socketio = SocketIO(app, cors_allowed_origins=allowed_origins)
 
 # Global monitoring flag
 monitoring_active = False
@@ -45,7 +59,7 @@ monitor_thread = None
 config = Config('config/config.yaml')
 logger = Logger.setup_logging(config)
 rules_data = load_rules(config.get('detection.rule_based.rules_file', 'config/rules.json'))
-db = DatabaseManager(config.get('database.path', 'data/db/threats.db'))
+db = DatabaseManager(os.environ.get('THREAT_DB_PATH') or config.get('database.path', 'data/db/threats.db'))
 system_monitor = SystemMonitor(config.config)
 network_monitor = NetworkMonitor(config.config)
 rule_engine = RuleEngine(rules_data)
@@ -84,27 +98,58 @@ app.register_blueprint(ml_bp)
 
 # ==================== WEB ROUTES ====================
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Login page and authentication handler"""
+    if request.method == 'POST':
+        username = request.form.get('username', '')
+        password = request.form.get('password', '')
+
+        user = db.get_user_by_username(username)
+        if user and verify_password(user['password_hash'], password):
+            session['username'] = username
+            db.update_last_login(username)
+            next_url = request.args.get('next') or url_for('index')
+            return redirect(next_url)
+
+        return render_template('login.html', error='Invalid username or password'), 401
+
+    return render_template('login.html')
+
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    """Log the current user out"""
+    session.pop('username', None)
+    return redirect(url_for('login'))
+
+
 @app.route('/')
+@login_required
 def index():
     """Main dashboard page"""
     return render_template('dashboard.html')
 
 @app.route('/threats')
+@login_required
 def threats_page():
     """Threats list page"""
     return render_template('threats.html')
 
 @app.route('/analytics')
+@login_required
 def analytics_page():
     """Analytics and reports page"""
     return render_template('analytics.html')
 
 @app.route('/assistant')
+@login_required
 def assistant_page():
     """AI Security Assistant page"""
     return render_template('assistant.html')
 
 @app.route('/settings')
+@login_required
 def settings_page():
     """Settings and configuration page"""
     return render_template('settings.html')
@@ -113,6 +158,7 @@ def settings_page():
 # ==================== API ENDPOINTS ====================
 
 @app.route('/api/stats')
+@login_required
 def get_stats():
     """Get threat statistics"""
     try:
@@ -129,6 +175,7 @@ def get_stats():
         }), 500
 
 @app.route('/api/threats')
+@login_required
 def get_threats():
     """Get recent threats"""
     try:
@@ -147,6 +194,7 @@ def get_threats():
         }), 500
 
 @app.route('/api/threat/<int:threat_id>')
+@login_required
 def get_threat_detail(threat_id):
     """Get detailed information about a specific threat"""
     try:
@@ -173,6 +221,7 @@ def get_threat_detail(threat_id):
         }), 500
 
 @app.route('/api/system-metrics')
+@login_required
 def get_system_metrics():
     """Get current system metrics"""
     try:
@@ -199,6 +248,7 @@ def get_system_metrics():
         }), 500
 
 @app.route('/api/threat-timeline')
+@login_required
 def get_threat_timeline():
     """Get threat timeline data for charts"""
     try:
@@ -240,6 +290,7 @@ def get_threat_timeline():
         }), 500
 
 @app.route('/api/scan/start', methods=['POST'])
+@login_required
 def start_scan():
     """Start a single scan"""
     try:
@@ -257,6 +308,7 @@ def start_scan():
         }), 500
 
 @app.route('/api/monitoring/status')
+@login_required
 def get_monitoring_status():
     """Get current monitoring status"""
     return jsonify({
@@ -268,6 +320,7 @@ def get_monitoring_status():
     })
 
 @app.route('/api/monitoring/start', methods=['POST'])
+@login_required
 def start_monitoring():
     """Start continuous monitoring"""
     global monitoring_active, monitor_thread
@@ -287,6 +340,7 @@ def start_monitoring():
         })
 
 @app.route('/api/monitoring/stop', methods=['POST'])
+@login_required
 def stop_monitoring():
     """Stop continuous monitoring"""
     global monitoring_active
@@ -304,20 +358,21 @@ def stop_monitoring():
         })
 
 @app.route('/api/assistant/chat', methods=['POST'])
+@login_required
 def assistant_chat():
     """Handle AI assistant chat requests"""
     try:
         data = request.get_json()
         user_message = data.get('message', '')
-        
+
         if not user_message:
             return jsonify({
                 'success': False,
                 'error': 'Message is required'
             }), 400
-        
+
         # Get AI response
-        response = ai_assistant.process_query(user_message)
+        response = ai_assistant.answer_question(user_message)
         
         return jsonify({
             'success': True,
@@ -452,14 +507,18 @@ def handle_request_update():
 # ==================== MAIN ====================
 
 if __name__ == '__main__':
+    dashboard_host = config.get('dashboard.host', '127.0.0.1')
+    dashboard_port = config.get('dashboard.port', 5000)
+    debug_mode = config.get('system.debug', False) and config.get('system.environment') == 'development'
+
     print("=" * 70)
     print("  Cybersecurity Threat Advisor - Web Dashboard")
     print("=" * 70)
-    print(f"  Dashboard URL: http://localhost:5000")
+    print(f"  Dashboard URL: http://{dashboard_host}:{dashboard_port}")
     print(f"  Backend: Integrated monitoring system")
     print(f"  Real-time: WebSocket enabled")
+    print(f"  Debug mode: {debug_mode}")
     print("=" * 70)
     print()
-    
-    # Run Flask app with SocketIO
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True, allow_unsafe_werkzeug=True)
+
+    socketio.run(app, host=dashboard_host, port=dashboard_port, debug=debug_mode)
