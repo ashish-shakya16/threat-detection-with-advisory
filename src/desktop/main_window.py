@@ -527,12 +527,14 @@ class MainWindow(QMainWindow):
         self.scan_button.setEnabled(True)
 
         if threats:
+            critical_count = sum(1 for t in threats if t.get('severity', '').lower() == 'critical')
+            high_count = sum(1 for t in threats if t.get('severity', '').lower() == 'high')
             QMessageBox.information(
                 self,
                 "Scan Complete",
                 f"Found {len(threats)} threats\n\n" +
-                f"Critical: {sum(1 for t in threats if t.get('severity') == 'Critical')}\n" +
-                f"High: {sum(1 for t in threats if t.get('severity') == 'High')}"
+                f"Critical: {critical_count}\n" +
+                f"High: {high_count}"
             )
 
         self.refresh_data()
@@ -579,7 +581,7 @@ class MainWindow(QMainWindow):
 
             for row, threat in enumerate(threats):
                 self.recent_threats_table.setItem(row, 0, QTableWidgetItem(threat.get('threat_name', '')))
-                self.recent_threats_table.setItem(row, 1, QTableWidgetItem(threat.get('severity', '')))
+                self.recent_threats_table.setItem(row, 1, QTableWidgetItem(str(threat.get('severity', '')).title()))
 
                 risk_score = threat.get('risk_score', 0)
                 self.recent_threats_table.setItem(row, 2, QTableWidgetItem(f"{risk_score:.2f}"))
@@ -598,14 +600,14 @@ class MainWindow(QMainWindow):
 
             severity_filter = self.severity_filter.currentText()
             if severity_filter != "All":
-                threats = [t for t in threats if t.get('severity') == severity_filter]
+                threats = [t for t in threats if t.get('severity', '').lower() == severity_filter.lower()]
 
             self.threats_table.setRowCount(len(threats))
 
             for row, threat in enumerate(threats):
                 self.threats_table.setItem(row, 0, QTableWidgetItem(str(threat.get('id', ''))))
                 self.threats_table.setItem(row, 1, QTableWidgetItem(threat.get('threat_name', '')))
-                self.threats_table.setItem(row, 2, QTableWidgetItem(threat.get('severity', '')))
+                self.threats_table.setItem(row, 2, QTableWidgetItem(str(threat.get('severity', '')).title()))
 
                 risk_score = threat.get('risk_score', 0)
                 self.threats_table.setItem(row, 3, QTableWidgetItem(f"{risk_score:.2f}"))
