@@ -76,9 +76,6 @@ def assistant_page():
 def settings_page():
     """Settings and configuration page"""
     return render_template('settings.html')
-def settings_page():
-    """Settings and configuration page"""
-    return render_template('settings.html')
 
 
 # ==================== API ENDPOINTS ====================
