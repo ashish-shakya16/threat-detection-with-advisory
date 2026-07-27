@@ -170,3 +170,20 @@ performance:
   queue_size: 1000
   batch_processing: true
   batch_size: 100
+
+# Email Notifications Configuration
+notifications:
+  enabled: false
+  notify_on_critical: true
+  notify_on_high: true
+  notify_on_medium: false
+  notify_on_low: false
+  recipients: []
+  smtp:
+    smtp_server: "smtp.gmail.com"
+    smtp_port: 587
+    sender_email: "your-email@gmail.com"
+    sender_password: "your-app-password"
+    use_tls: true
+    retry_attempts: 3
+    retry_delay: 2

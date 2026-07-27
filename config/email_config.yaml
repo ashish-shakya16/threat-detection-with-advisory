@@ -1,0 +1,63 @@
+# Email Notification Configuration Template
+#
+# This file shows all email configuration options.
+# Copy these settings to config.yaml and customize.
+
+notifications:
+  # Master switch for all notifications
+  enabled: false
+
+  # Which threat levels trigger notifications
+  notify_on_critical: true   # Immediate alert for Critical threats
+  notify_on_high: true       # Alert for High-risk threats
+  notify_on_medium: false    # Alert for Medium-risk threats
+  notify_on_low: false       # Alert for Low-risk threats
+
+  # Email recipients (list of valid email addresses)
+  recipients:
+    - "security-team@example.com"
+    - "ciso@example.com"
+
+  # SMTP Configuration
+  smtp:
+    # Gmail example:
+    smtp_server: "smtp.gmail.com"
+    smtp_port: 587
+
+    # Outlook example:
+    # smtp_server: "smtp-mail.outlook.com"
+    # smtp_port: 587
+
+    # Custom SMTP:
+    # smtp_server: "mail.company.com"
+    # smtp_port: 465  # Use 465 for SSL, 587 for TLS
+
+    # Email account details
+    sender_email: "your-email@gmail.com"
+
+    # For Gmail: Use an App Password (not your main password)
+    # See: https://support.google.com/accounts/answer/185833
+    sender_password: "your-app-specific-password"
+
+    # Security settings
+    use_tls: true           # Use TLS encryption (recommended)
+    retry_attempts: 3       # Retry failed sends
+    retry_delay: 2          # Seconds between retries
+
+# SETUP INSTRUCTIONS:
+#
+# 1. Gmail Setup:
+#    a. Enable 2-factor authentication on your Google account
+#    b. Generate an "App Password" at myaccount.google.com/apppasswords
+#    c. Set sender_email to your Gmail address
+#    d. Set sender_password to the 16-character app password
+#
+# 2. Outlook Setup:
+#    a. Use your Outlook email address
+#    b. Use your Outlook password (or app password if 2FA enabled)
+#    c. Set smtp_server to smtp-mail.outlook.com
+#
+# 3. Custom SMTP:
+#    a. Get SMTP details from your email provider
+#    b. Ensure port is open (usually 587 for TLS or 465 for SSL)
+#    c. Test with `python -c "from src.notifications.email_service import EmailService; ..."`

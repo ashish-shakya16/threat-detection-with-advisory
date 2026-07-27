@@ -90,11 +90,22 @@ class ThreatAdvisor:
         self.logger.info("Initializing advisory system...")
         advisory_templates = rules_data.get('advisory_templates', {})
         self.advisor = SecurityAdvisor(advisory_templates, self.config.config)
-        
+
+        # Initialize notification system
+        self.notification_manager = None
+        notification_config = self.config.config.get('notifications', {})
+        if notification_config.get('enabled', False):
+            try:
+                from src.notifications.notification_manager import NotificationManager
+                self.notification_manager = NotificationManager(notification_config)
+                self.logger.info("Notification system initialized")
+            except Exception as e:
+                self.logger.error(f"Failed to initialize notifications: {str(e)}")
+
         # Running state
         self.running = False
         self.scan_count = 0
-        
+
         self.logger.info("[OK] All modules initialized successfully")
         self.logger.info("")
     
@@ -161,7 +172,10 @@ class ThreatAdvisor:
                 
                 # Log advisory to database
                 self.db.log_advisory(threat_id, advisory)
-                
+
+                # Send notifications
+                self._send_threat_notification(threat)
+
                 # Display alert
                 self._display_alert(threat, advisory)
         
@@ -180,17 +194,34 @@ class ThreatAdvisor:
         
         return results
     
+    def _send_threat_notification(self, threat: dict) -> None:
+        """
+        Send notification for detected threat if configured.
+
+        Args:
+            threat: Threat dictionary with detection details
+        """
+        if not self.notification_manager:
+            return
+
+        try:
+            success = self.notification_manager.notify_threat(threat)
+            if success:
+                self.logger.info(f"Notification sent for threat: {threat.get('threat_name')}")
+        except Exception as e:
+            self.logger.error(f"Failed to send threat notification: {str(e)}")
+
     def _display_alert(self, threat: dict, advisory: dict):
         """
         Display threat alert and advisory.
-        
+
         Args:
             threat: Threat dictionary
             advisory: Advisory dictionary
         """
         if not self.config.get('alerts.console.enabled', True):
             return
-        
+
         # Only show high/medium risk in console (to avoid spam)
         risk_level = threat.get('risk_level', 'Unknown')
         if risk_level in ['High', 'Critical', 'Medium']:
