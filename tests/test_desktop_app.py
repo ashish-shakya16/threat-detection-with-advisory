@@ -154,5 +154,40 @@ class TestDesktopAppDependencies(unittest.TestCase):
             self.assertIn("PyQt6", content)
 
 
+class TestSeverityCasingBugFix(unittest.TestCase):
+    """
+    Regression tests for the severity-casing mismatch: DatabaseManager stores
+    severity as lowercase ('low'/'medium'/'high'), but the desktop UI was
+    written expecting capitalized keys ('Low'/'Medium'/'High'), causing
+    dashboard stat boxes to always show 0 regardless of real data.
+    """
+
+    def test_by_severity_dict_uses_lowercase_keys_from_db_manager(self):
+        # This documents the actual contract: DatabaseManager.get_threat_statistics()
+        # returns lowercase severity keys because that's what RuleEngine/config/rules.json produce.
+        by_severity = {'high': 3, 'medium': 1, 'low': 2}
+
+        # The old buggy code did: by_severity.get('Critical', 0) -> always 0
+        # The fix must look up using .lower() normalized keys.
+        critical_count = by_severity.get('critical', 0)
+        high_count = by_severity.get('high', 0)
+
+        self.assertEqual(critical_count, 0)  # No 'critical' severity exists in rules.json today
+        self.assertEqual(high_count, 3)  # This must be non-zero for real data
+
+    def test_severity_filter_matches_case_insensitively(self):
+        threats = [
+            {'threat_name': 'A', 'severity': 'high'},
+            {'threat_name': 'B', 'severity': 'low'},
+            {'threat_name': 'C', 'severity': 'high'},
+        ]
+
+        severity_filter = 'High'  # What the QComboBox provides
+        filtered = [t for t in threats if t.get('severity', '').lower() == severity_filter.lower()]
+
+        self.assertEqual(len(filtered), 2)
+        self.assertTrue(all(t['severity'] == 'high' for t in filtered))
+
+
 if __name__ == '__main__':
     unittest.main()

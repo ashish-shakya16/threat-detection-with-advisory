@@ -543,23 +543,27 @@ class MainWindow(QMainWindow):
             stats = self.db.get_threat_statistics()
 
             # Update summary
+            # Note: DatabaseManager stores severity lowercase ('low'/'medium'/'high'),
+            # matching what RuleEngine/config/rules.json produce.
             total = stats.get('total_threats', 0)
             by_severity = stats.get('by_severity', {})
 
             self.total_threats_label.value_label.setText(str(total))
-            self.critical_label.value_label.setText(str(by_severity.get('Critical', 0)))
-            self.high_label.value_label.setText(str(by_severity.get('High', 0)))
-            self.medium_label.value_label.setText(str(by_severity.get('Medium', 0)))
-            self.low_label.value_label.setText(str(by_severity.get('Low', 0)))
+            self.critical_label.value_label.setText(str(by_severity.get('critical', 0)))
+            self.high_label.value_label.setText(str(by_severity.get('high', 0)))
+            self.medium_label.value_label.setText(str(by_severity.get('medium', 0)))
+            self.low_label.value_label.setText(str(by_severity.get('low', 0)))
 
             # Update system metrics
             try:
+                import os
                 import psutil
+                disk_path = os.path.abspath(os.sep)  # 'C:\\' on Windows, '/' on Unix
                 self.cpu_label.value_label.setText(f"{psutil.cpu_percent()}%")
                 self.memory_label.value_label.setText(f"{psutil.virtual_memory().percent}%")
-                self.disk_label.value_label.setText(f"{psutil.disk_usage('/').percent}%")
-            except:
-                pass
+                self.disk_label.value_label.setText(f"{psutil.disk_usage(disk_path).percent}%")
+            except Exception as e:
+                self.logger.debug(f"Failed to read system metrics: {e}")
 
             # Update recent threats
             self.refresh_recent_threats_table()
