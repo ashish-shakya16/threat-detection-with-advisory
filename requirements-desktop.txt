@@ -1,0 +1,12 @@
+# Desktop Application Dependencies
+PyQt6==6.7.0
+PyQt6-Charts==6.7.0
+PyQt6-sip==13.8.0
+
+# Core dependencies (from requirements.txt)
+psutil==6.0.0
+requests==2.31.0
+PyYAML==6.0.1
+
+# Optional: Email/SMS/Webhooks
+twilio==9.0.4
