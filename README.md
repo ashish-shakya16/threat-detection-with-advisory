@@ -84,6 +84,16 @@ pip install -r requirements.txt
 python main.py --init
 ```
 
+6. **Set up authentication (required to use the web dashboard):**
+```bash
+# Set a session secret key (required — the app will not start without this)
+python -c "import secrets; print(secrets.token_hex(32))"
+set SECRET_KEY=<paste the value printed above>
+
+# Create your admin login
+python scripts/create_admin_user.py <your-username> <your-email>
+```
+
 ---
 
 ## 🚀 Quick Start
