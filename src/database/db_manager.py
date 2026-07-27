@@ -46,84 +46,61 @@ class DatabaseManager:
         """Create database and tables if they don't exist."""
         import os
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-        
+
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
-        # Threats table - stores detected security threats
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS threats (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT NOT NULL,
-                threat_id TEXT NOT NULL,
-                threat_name TEXT NOT NULL,
-                category TEXT NOT NULL,
-                severity TEXT NOT NULL,
-                risk_level TEXT NOT NULL,
-                risk_score REAL NOT NULL,
-                confidence REAL NOT NULL,
-                source TEXT,
-                description TEXT,
-                details TEXT,
-                status TEXT DEFAULT 'active',
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
-        # Events table - stores monitoring events (system, network, file)
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT NOT NULL,
-                event_type TEXT NOT NULL,
-                source TEXT NOT NULL,
-                event_data TEXT,
-                severity TEXT,
-                processed BOOLEAN DEFAULT 0,
-                threat_id INTEGER,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (threat_id) REFERENCES threats(id)
-            )
-        ''')
-        
-        # Advisories table - stores security advisories
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS advisories (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                threat_id INTEGER NOT NULL,
-                title TEXT NOT NULL,
-                description TEXT,
-                advice TEXT,
-                remediation TEXT,
-                reference_links TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (threat_id) REFERENCES threats(id)
-            )
-        ''')
-        
-        # System status table - stores system health metrics
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS system_status (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT NOT NULL,
-                cpu_usage REAL,
-                memory_usage REAL,
-                disk_usage REAL,
-                network_connections INTEGER,
-                active_threats INTEGER,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
-        # Create indexes for faster queries
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_threats_timestamp ON threats(timestamp)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_threats_severity ON threats(severity)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type)')
-        
+
+        # Load and execute schema.sql
+        schema_path = os.path.join(os.path.dirname(__file__), 'schema.sql')
+        if os.path.exists(schema_path):
+            with open(schema_path, 'r') as f:
+                schema_sql = f.read()
+                cursor.executescript(schema_sql)
+        else:
+            # Fallback to inline schema if schema.sql doesn't exist
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS threats (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    threat_name TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    risk_level TEXT NOT NULL,
+                    risk_score REAL NOT NULL,
+                    severity REAL,
+                    confidence REAL,
+                    source TEXT,
+                    description TEXT,
+                    detected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    status TEXT DEFAULT 'active'
+                )
+            ''')
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS advisories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    threat_id INTEGER NOT NULL,
+                    title TEXT,
+                    description TEXT,
+                    reason TEXT,
+                    recommended_actions TEXT,
+                    preventive_tips TEXT,
+                    reference_links TEXT,
+                    generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (threat_id) REFERENCES threats(id)
+                )
+            ''')
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS ai_conversations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    query TEXT,
+                    response TEXT,
+                    confidence REAL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
         conn.commit()
         conn.close()
-        
+
         self.logger.info(f"Database initialized at {self.db_path}")
     
     def log_threat(self, threat_data: Dict[str, Any]) -> int:
