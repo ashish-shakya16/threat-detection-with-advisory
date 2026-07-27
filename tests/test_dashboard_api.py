@@ -12,9 +12,11 @@ from src.dashboard.app import app
 
 @pytest.fixture
 def client():
-    """Flask test client"""
+    """Flask test client, authenticated as a logged-in user."""
     app.config['TESTING'] = True
     with app.test_client() as client:
+        with client.session_transaction() as sess:
+            sess['username'] = 'test-fixture-user'
         yield client
 
 
