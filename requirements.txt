@@ -15,6 +15,7 @@ requests>=2.31
 # Machine learning
 numpy>=1.26
 scikit-learn>=1.5
+joblib>=1.4
 
 # Notifications (SMS - optional but imported if enabled)
 twilio==9.0.4
