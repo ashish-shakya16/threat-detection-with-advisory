@@ -490,6 +490,56 @@ class DatabaseManager:
         finally:
             conn.close()
 
+    def log_conversation(self, user_id: int, query: str, response: str, confidence: float = 1.0) -> int:
+        """
+        Log an AI assistant conversation turn.
+
+        Args:
+            user_id: ID of the user who asked the question
+            query: The user's question
+            response: The assistant's response
+            confidence: Confidence score of the response (0-1)
+
+        Returns:
+            ID of the inserted conversation record
+        """
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO ai_conversations (user_id, query, response, confidence)
+                VALUES (?, ?, ?, ?)
+            ''', (user_id, query, response, confidence))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            conn.close()
+
+    def get_conversations_for_user(self, user_id: int, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Get recent conversation history for a user.
+
+        Args:
+            user_id: User ID to fetch conversations for
+            limit: Maximum number of conversations to return
+
+        Returns:
+            List of conversation dictionaries, most recent first
+        """
+        conn = sqlite3.connect(self.db_path)
+        try:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT * FROM ai_conversations
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+            ''', (user_id, limit))
+            return [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
+
     def cleanup_old_logs(self, days: int = 30):
         """
         Delete old threat logs.

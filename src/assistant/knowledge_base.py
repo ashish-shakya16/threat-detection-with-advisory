@@ -51,8 +51,9 @@ class KnowledgeBase:
         if self.db_manager:
             try:
                 self.db_manager.log_conversation(user_id, query, response, confidence)
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+                logging.getLogger('securex').warning(f"Failed to store conversation: {e}")
 
     def get_faq_answer(self, question: str) -> Optional[str]:
         """Get FAQ answer for common questions"""

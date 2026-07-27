@@ -149,6 +149,17 @@ class TestDatabaseManager(unittest.TestCase):
         user = self.db.get_user_by_username('carol')
         self.assertIsNotNone(user['last_login'])
 
+    def test_log_conversation_and_retrieve(self):
+        self.db.log_conversation(user_id=1, query='what is ransomware', response='...', confidence=0.9)
+
+        conversations = self.db.get_conversations_for_user(user_id=1)
+        self.assertEqual(len(conversations), 1)
+        self.assertEqual(conversations[0]['query'], 'what is ransomware')
+
+    def test_get_conversations_for_user_returns_empty_list_when_none(self):
+        conversations = self.db.get_conversations_for_user(user_id=999)
+        self.assertEqual(conversations, [])
+
 
 if __name__ == '__main__':
     unittest.main()
