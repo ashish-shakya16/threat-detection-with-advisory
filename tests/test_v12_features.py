@@ -24,12 +24,17 @@ class TestSMSService(unittest.TestCase):
         }
 
     def test_phone_validation_valid(self):
-        """Test valid phone number validation"""
+        """Test valid phone number validation.
+
+        Validation now uses the phonenumbers library (Google's
+        libphonenumber), which requires unambiguous E.164 format with a
+        country code. Loosely-formatted numbers without a leading '+' are
+        no longer accepted since they can't be reliably parsed without
+        knowing the country context.
+        """
         valid_phones = [
-            '+1 (555) 123-4567',
-            '555-123-4567',
-            '5551234567',
-            '+15551234567'
+            '+14155552671',
+            '+442071838750',
         ]
         for phone in valid_phones:
             self.assertTrue(SMSService.validate_phone(phone))

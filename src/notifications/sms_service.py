@@ -5,8 +5,9 @@ Provides SMS alerts for critical threats using Twilio integration.
 """
 
 import logging
-import re
 from typing import Dict, Any, List
+
+import phonenumbers
 
 from src.exceptions import NotificationException
 
@@ -61,9 +62,19 @@ class SMSService:
 
     @staticmethod
     def validate_phone(phone: str) -> bool:
-        """Validate phone number format."""
-        pattern = r'^\+?1?[-.\s]?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})$'
-        return bool(re.match(pattern, phone))
+        """
+        Validate phone number format using Google's libphonenumber (via the
+        phonenumbers package), which supports international numbers.
+
+        Numbers must be in E.164 format with a leading '+' and country code
+        (e.g. '+14155552671', '+442071838750') since a bare national number
+        is ambiguous without knowing which country's numbering plan applies.
+        """
+        try:
+            parsed = phonenumbers.parse(phone, None)
+            return phonenumbers.is_valid_number(parsed)
+        except phonenumbers.NumberParseException:
+            return False
 
     def send_sms(self, recipient: str, message: str) -> bool:
         """
