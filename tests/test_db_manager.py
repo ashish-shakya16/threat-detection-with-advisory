@@ -124,6 +124,31 @@ class TestDatabaseManager(unittest.TestCase):
         self.assertIn('date', timeline[0])
         self.assertIn('count', timeline[0])
 
+    def test_create_user_and_fetch_by_username(self):
+        user_id = self.db.create_user('alice', 'alice@example.com', 'hashed_password_value')
+        self.assertIsInstance(user_id, int)
+
+        user = self.db.get_user_by_username('alice')
+        self.assertIsNotNone(user)
+        self.assertEqual(user['email'], 'alice@example.com')
+        self.assertEqual(user['password_hash'], 'hashed_password_value')
+
+    def test_get_user_by_username_returns_none_when_missing(self):
+        user = self.db.get_user_by_username('does_not_exist')
+        self.assertIsNone(user)
+
+    def test_create_user_rejects_duplicate_username(self):
+        self.db.create_user('bob', 'bob@example.com', 'hash1')
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.create_user('bob', 'bob2@example.com', 'hash2')
+
+    def test_update_last_login(self):
+        self.db.create_user('carol', 'carol@example.com', 'hash')
+        self.db.update_last_login('carol')
+
+        user = self.db.get_user_by_username('carol')
+        self.assertIsNotNone(user['last_login'])
+
 
 if __name__ == '__main__':
     unittest.main()

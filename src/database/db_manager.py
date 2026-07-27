@@ -424,6 +424,72 @@ class DatabaseManager:
         finally:
             conn.close()
 
+    def create_user(self, username: str, email: str, password_hash: str) -> int:
+        """
+        Create a new user account.
+
+        Args:
+            username: Unique username
+            email: Unique email address
+            password_hash: Pre-hashed password (never store plaintext)
+
+        Returns:
+            ID of the created user
+
+        Raises:
+            sqlite3.IntegrityError: If username or email already exists
+        """
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO users (username, email, password_hash)
+                VALUES (?, ?, ?)
+            ''', (username, email, password_hash))
+            conn.commit()
+            user_id = cursor.lastrowid
+            self.logger.info(f"Created user: {username} (ID: {user_id})")
+            return user_id
+        finally:
+            conn.close()
+
+    def get_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
+        """
+        Fetch a user by username.
+
+        Args:
+            username: Username to look up
+
+        Returns:
+            User dictionary or None if not found
+        """
+        conn = sqlite3.connect(self.db_path)
+        try:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM users WHERE username = ?', (username,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        finally:
+            conn.close()
+
+    def update_last_login(self, username: str):
+        """
+        Update a user's last_login timestamp to now.
+
+        Args:
+            username: Username to update
+        """
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE username = ?
+            ''', (username,))
+            conn.commit()
+        finally:
+            conn.close()
+
     def cleanup_old_logs(self, days: int = 30):
         """
         Delete old threat logs.
