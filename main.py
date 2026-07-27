@@ -281,7 +281,7 @@ class ThreatAdvisor:
         
         for i, threat in enumerate(threats, 1):
             print(f"{i}. [{threat['risk_level']}] {threat['threat_name']}")
-            print(f"   Time: {threat['timestamp']}")
+            print(f"   Time: {threat['detected_at']}")
             print(f"   Category: {threat['category']}")
             print(f"   Risk Score: {threat['risk_score']:.2f}")
             print()
