@@ -24,6 +24,9 @@ from src.detection.rule_engine import RuleEngine
 from src.risk_assessment.risk_scorer import RiskScorer
 from src.advisory.advisor import SecurityAdvisor
 from src.assistant.ai_assistant import AIAssistant
+from src.dashboard.routes.api_threats import init_threats_routes
+from src.dashboard.routes.api_stats import init_stats_routes
+from src.dashboard.routes.api_analytics import init_analytics_routes
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -48,6 +51,15 @@ advisor = SecurityAdvisor(rules_data['advisory_templates'], config.config)
 ai_assistant = AIAssistant(db, config.config)
 
 logger.info("Flask Dashboard initialized")
+
+# Register API blueprints
+threats_bp = init_threats_routes(db, app)
+stats_bp = init_stats_routes(db, app)
+analytics_bp = init_analytics_routes(db, app)
+
+app.register_blueprint(threats_bp)
+app.register_blueprint(stats_bp)
+app.register_blueprint(analytics_bp)
 
 
 # ==================== WEB ROUTES ====================
