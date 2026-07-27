@@ -16,10 +16,10 @@ def init_analytics_routes(db, app):
         """Get threat detection timeline"""
         try:
             days = request.args.get('days', 7, type=int)
-            # timeline = db.get_threat_timeline(days=days)
+            timeline = db.get_threat_timeline_by_day(days=days)
             return jsonify({
                 'success': True,
-                'data': []
+                'data': timeline
             })
         except Exception as e:
             logger.error(f"Error fetching timeline: {e}")
@@ -50,9 +50,13 @@ def init_analytics_routes(db, app):
         """Get detection rate statistics"""
         try:
             period = request.args.get('period', 'daily')
+            hours = 24 if period == 'daily' else 24 * 7
+            stats = db.get_threat_statistics(hours=hours)
+            total = stats.get('total_threats', 0)
+            rate = round(total / hours, 3) if hours else 0.0
             return jsonify({
                 'success': True,
-                'data': {'period': period, 'rate': 0.0}
+                'data': {'period': period, 'rate': rate, 'total_threats': total}
             })
         except Exception as e:
             logger.error(f"Error fetching detection rate: {e}")
