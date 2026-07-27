@@ -731,8 +731,7 @@ Advisory: {threat.get('advisory', {}).get('summary', 'No advisory')}
 
         if reply == QMessageBox.StandardButton.Yes:
             try:
-                cutoff_date = datetime.now() - timedelta(days=30)
-                # Implementation would depend on DB schema
+                self.db.cleanup_old_logs(days=30)
                 QMessageBox.information(self, "Success", "Old threats cleared")
             except Exception as e:
                 QMessageBox.critical(self, "Error", str(e))
@@ -740,7 +739,7 @@ Advisory: {threat.get('advisory', {}).get('summary', 'No advisory')}
     def optimize_database(self):
         """Optimize database"""
         try:
-            self.db.db_connection.execute("VACUUM")
+            self.db.vacuum()
             QMessageBox.information(self, "Success", "Database optimized")
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))

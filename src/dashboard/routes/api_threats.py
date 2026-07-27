@@ -65,13 +65,13 @@ def init_threats_routes(db, app):
             data = request.get_json()
             status = data.get('status')
 
-            if status not in ['resolved', 'ignored', 'escalated']:
+            if status not in ['resolved', 'ignored', 'escalated', 'active']:
                 return jsonify({
                     'success': False,
                     'error': 'Invalid status'
                 }), 400
 
-            # db.update_threat_status(threat_id, status)
+            db.update_threat_status(threat_id, status)
 
             return jsonify({
                 'success': True,
