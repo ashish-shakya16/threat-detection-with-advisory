@@ -188,35 +188,37 @@ class DatabaseManager:
     def log_advisory(self, threat_id: int, advisory_data: Dict[str, Any]) -> int:
         """
         Log security advisory for a threat.
-        
+
         Args:
             threat_id: ID of associated threat
-            advisory_data: Advisory information
-        
+            advisory_data: Advisory information with keys:
+                title, description, advice (list), remediation (str), references (list)
+
         Returns:
             ID of inserted advisory record
         """
         conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            INSERT INTO advisories (
-                threat_id, title, description, advice, remediation, reference_links
-            ) VALUES (?, ?, ?, ?, ?, ?)
-        ''', (
-            threat_id,
-            advisory_data.get('title'),
-            advisory_data.get('description'),
-            json.dumps(advisory_data.get('advice', [])),
-            advisory_data.get('remediation'),
-            json.dumps(advisory_data.get('references', []))
-        ))
-        
-        advisory_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        
-        return advisory_id
+        try:
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                INSERT INTO advisories (
+                    threat_id, title, description, reason, recommended_actions, reference_links
+                ) VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                threat_id,
+                advisory_data.get('title'),
+                advisory_data.get('description'),
+                advisory_data.get('description'),
+                json.dumps(advisory_data.get('advice', [])),
+                json.dumps(advisory_data.get('references', []))
+            ))
+
+            advisory_id = cursor.lastrowid
+            conn.commit()
+            return advisory_id
+        finally:
+            conn.close()
     
     def get_recent_threats(self, limit: int = 50, hours: int = 24) -> List[Dict[str, Any]]:
         """
