@@ -9,7 +9,8 @@ separate hand-built GUI. There is exactly one UI to maintain — everything on
 the web dashboard (Dashboard, Threats, Analytics, AI Assistant, Settings)
 works identically here, with no feature gap between the two.
 
-See [DESKTOP_QUICKSTART.md](DESKTOP_QUICKSTART.md) for setup and usage.
+See [DESKTOP_QUICKSTART.md](DESKTOP_QUICKSTART.md) for setup and usage, or
+[BUILD_EXE.md](BUILD_EXE.md) to package it into a standalone Windows `.exe`.
 
 ## Architecture
 

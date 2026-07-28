@@ -27,8 +27,19 @@ except ImportError:
     print("  pip install -r requirements-desktop.txt")
     sys.exit(1)
 
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, ROOT_DIR)
+# When frozen by PyInstaller (--onedir):
+#   - bundled read-only resources (config/, frontend/dist/, assets_build/)
+#     live under _internal/, exposed at runtime as sys._MEIPASS
+#   - the exe's own folder (sys.executable's directory) is where writable
+#     state (.env, and the sqlite database via THREAT_DB_PATH below) should
+#     live, since _internal is conceptually read-only bundle content
+if getattr(sys, "frozen", False):
+    APP_DIR = os.path.dirname(sys.executable)
+    RESOURCE_DIR = sys._MEIPASS
+else:
+    APP_DIR = os.path.dirname(os.path.abspath(__file__))
+    RESOURCE_DIR = APP_DIR
+sys.path.insert(0, RESOURCE_DIR)
 
 HOST = "127.0.0.1"
 PORT = 5000
@@ -44,7 +55,7 @@ def _ensure_secret_key():
     if os.environ.get("SECRET_KEY"):
         return
 
-    env_path = os.path.join(ROOT_DIR, ".env")
+    env_path = os.path.join(APP_DIR, ".env")
     existing_lines = []
     if os.path.exists(env_path):
         with open(env_path, "r", encoding="utf-8") as f:
@@ -93,12 +104,21 @@ def _wait_for_backend(timeout: float = 15.0) -> bool:
 
 def main():
     # app.py resolves config/data paths relative to the process CWD, which a
-    # double-clicked shortcut won't guarantee — pin it to the repo root.
-    os.chdir(ROOT_DIR)
+    # double-clicked shortcut won't guarantee — pin it to where the bundled
+    # (or, when not frozen, source-tree) resources actually live.
+    os.chdir(RESOURCE_DIR)
+
+    # The database is writable state, not bundle content — keep it next to
+    # the exe (APP_DIR) so it survives reinstalls/updates of the bundle,
+    # rather than defaulting into the read-only _internal folder.
+    if getattr(sys, "frozen", False) and not os.environ.get("THREAT_DB_PATH"):
+        data_dir = os.path.join(APP_DIR, "data", "db")
+        os.makedirs(data_dir, exist_ok=True)
+        os.environ["THREAT_DB_PATH"] = os.path.join(data_dir, "threats.db")
 
     _ensure_secret_key()
 
-    dist_index = os.path.join(ROOT_DIR, "frontend", "dist", "index.html")
+    dist_index = os.path.join(RESOURCE_DIR, "frontend", "dist", "index.html")
     if not os.path.exists(dist_index):
         print("Error: frontend build not found.")
         print(f"  Expected: {dist_index}")
@@ -109,7 +129,9 @@ def main():
     app.setApplicationName("SecureX Threat Advisor")
     app.setApplicationVersion("1.2.0")
 
-    icon_path = os.path.join(ROOT_DIR, "frontend", "public", "favicon.svg")
+    icon_path = os.path.join(RESOURCE_DIR, "assets_build", "securex.ico")
+    if not os.path.exists(icon_path):
+        icon_path = os.path.join(RESOURCE_DIR, "frontend", "public", "favicon.svg")
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
 

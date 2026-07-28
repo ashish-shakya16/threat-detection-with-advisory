@@ -125,6 +125,7 @@ SecureX is a **complete end-to-end cybersecurity threat detection and response s
 | QUICKSTART_V12.md | 350 | 10-minute setup guide |
 | DESKTOP_APP.md | - | Desktop app architecture (embeds the web dashboard via QWebEngineView) |
 | DESKTOP_QUICKSTART.md | - | Desktop app setup and usage |
+| BUILD_EXE.md | - | Packaging the desktop app into a standalone Windows .exe |
 | API_DOCUMENTATION.md | 400+ | REST API reference |
 
 ---
