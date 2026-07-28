@@ -132,6 +132,22 @@ SecureX is a **complete end-to-end cybersecurity threat detection and response s
 
 ## 🚀 Launch Instructions
 
+### First-time setup (required once, before any of the launch paths below)
+
+```bash
+pip install -r requirements.txt
+
+# The web dashboard and CLI both require SECRET_KEY to be set — there is no default.
+export SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")   # macOS/Linux
+# or on Windows PowerShell:
+#   $env:SECRET_KEY = python -c "import secrets; print(secrets.token_hex(32))"
+# (desktop_app.py generates and persists its own SECRET_KEY automatically — skip this for the desktop app)
+
+# There is no sign-up flow. Create the one login account you'll use to access
+# the web dashboard / desktop app before starting either:
+python scripts/create_admin_user.py <username> <email>
+```
+
 ### CLI Tool
 ```bash
 # Initialize
@@ -152,13 +168,16 @@ python main.py --stats
 
 ### Web Dashboard
 ```bash
+# Build the frontend once (and again after any frontend change)
+cd frontend && npm install && npm run build && cd ..
+
 # Terminal 1: Start monitoring
 python main.py --monitor
 
-# Terminal 2: Launch dashboard
+# Terminal 2: Launch dashboard (SECRET_KEY must be set, see First-time setup)
 python src/dashboard/app.py
 
-# Open browser: http://localhost:5000
+# Open browser: http://localhost:5000 and log in with the account created above
 ```
 
 ### Desktop Application
@@ -166,7 +185,10 @@ python src/dashboard/app.py
 # Install dependencies (first time only)
 C:\Python313\python.exe -m pip install -r requirements-desktop.txt
 
-# Launch app
+# Build the frontend once (and again after any frontend change)
+cd frontend && npm install && npm run build && cd ..
+
+# Launch app — bootstraps its own SECRET_KEY and runs the same backend in-process
 C:\Python313\python.exe desktop_app.py
 ```
 
