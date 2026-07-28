@@ -12,7 +12,8 @@ export function SeverityBadge({ severity }: { severity: string }) {
   const style = severityStyles[normalized] ?? 'bg-muted text-muted-foreground border-border';
 
   return (
-    <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize', style)}>
+    <span className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold capitalize', style)}>
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />
       {severity}
     </span>
   );

@@ -77,65 +77,68 @@ export default function DashboardPage() {
       />
 
       <div className="space-y-6 p-8">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {statsLoading ? (
-            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24" />)
+            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)
           ) : (
             <>
-              <StatCard label="Critical Threats" value={bySeverity.critical ?? 0} icon={AlertOctagon} colorClass="bg-red-600/15 text-red-500" />
-              <StatCard label="High Severity" value={bySeverity.high ?? 0} icon={AlertCircle} colorClass="bg-orange-600/15 text-orange-500" />
-              <StatCard label="Medium Severity" value={bySeverity.medium ?? 0} icon={AlertTriangle} colorClass="bg-amber-500/15 text-amber-500" />
-              <StatCard label="Low Severity" value={bySeverity.low ?? 0} icon={Info} colorClass="bg-blue-500/15 text-blue-500" />
+              <StatCard label="Critical Threats" value={bySeverity.critical ?? 0} icon={AlertOctagon} colorClass="bg-danger/15 text-danger" />
+              <StatCard label="High Severity" value={bySeverity.high ?? 0} icon={AlertCircle} colorClass="bg-warning/15 text-warning" />
+              <StatCard label="Medium Severity" value={bySeverity.medium ?? 0} icon={AlertTriangle} colorClass="bg-info/15 text-info" />
+              <StatCard label="Low Severity" value={bySeverity.low ?? 0} icon={Info} colorClass="bg-success/15 text-success" />
             </>
           )}
         </div>
 
-        <Card>
+        <Card className="border-border/60">
           <CardHeader>
-            <CardTitle>Threat Timeline (24h)</CardTitle>
+            <CardTitle className="text-[1.375rem]">Threat Timeline (24h)</CardTitle>
           </CardHeader>
           <CardContent className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={timeline ?? []}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="time" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="critical" stroke="#dc2626" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="high" stroke="#ea580c" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="medium" stroke="#f59e0b" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="low" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="time" tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} allowDecimals={false} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 12 }}
+                  labelStyle={{ color: 'var(--foreground)' }}
+                />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Line type="monotone" dataKey="critical" stroke="#dc2626" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
+                <Line type="monotone" dataKey="high" stroke="#ea580c" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
+                <Line type="monotone" dataKey="medium" stroke="#f59e0b" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
+                <Line type="monotone" dataKey="low" stroke="#3b82f6" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card>
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <Card className="hover-lift border-border/60">
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">CPU Usage</CardTitle></CardHeader>
-            <CardContent className="text-2xl font-bold">{metrics?.cpu_percent?.toFixed(1) ?? '0.0'}%</CardContent>
+            <CardContent className="text-3xl font-bold tracking-tight">{metrics?.cpu_percent?.toFixed(1) ?? '0.0'}%</CardContent>
           </Card>
-          <Card>
+          <Card className="hover-lift border-border/60">
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Memory Usage</CardTitle></CardHeader>
-            <CardContent className="text-2xl font-bold">{metrics?.memory_percent?.toFixed(1) ?? '0.0'}%</CardContent>
+            <CardContent className="text-3xl font-bold tracking-tight">{metrics?.memory_percent?.toFixed(1) ?? '0.0'}%</CardContent>
           </Card>
-          <Card>
+          <Card className="hover-lift border-border/60">
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Network Connections</CardTitle></CardHeader>
-            <CardContent className="text-2xl font-bold">{metrics?.network_connections ?? 0}</CardContent>
+            <CardContent className="text-3xl font-bold tracking-tight">{metrics?.network_connections ?? 0}</CardContent>
           </Card>
-          <Card>
+          <Card className="hover-lift border-border/60">
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Active Processes</CardTitle></CardHeader>
-            <CardContent className="text-2xl font-bold">{metrics?.process_count ?? 0}</CardContent>
+            <CardContent className="text-3xl font-bold tracking-tight">{metrics?.process_count ?? 0}</CardContent>
           </Card>
         </div>
 
-        <Card>
+        <Card className="border-border/60">
           <CardHeader>
-            <CardTitle>Recent Threats</CardTitle>
+            <CardTitle className="text-[1.375rem]">Recent Threats</CardTitle>
           </CardHeader>
           <CardContent>
-            {threatsLoading ? <Skeleton className="h-48" /> : <ThreatTable threats={threats ?? []} />}
+            {threatsLoading ? <Skeleton className="h-48 rounded-xl" /> : <ThreatTable threats={threats ?? []} />}
           </CardContent>
         </Card>
       </div>

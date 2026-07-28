@@ -24,11 +24,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <Card className="w-full max-w-sm">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-sm border-border/60 glass-panel shadow-2xl shadow-black/40">
         <CardHeader>
-          <CardTitle>Threat Advisor Login</CardTitle>
-          <CardDescription>Sign in to access the security dashboard</CardDescription>
+          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-linear-to-br from-primary to-accent-purple shadow-lg shadow-primary/30">
+            <img src="/favicon.svg" alt="" className="h-6 w-6" />
+          </div>
+          <CardTitle className="text-center text-xl">SecureX Threat Advisor</CardTitle>
+          <CardDescription className="text-center">Sign in to access the security dashboard</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
