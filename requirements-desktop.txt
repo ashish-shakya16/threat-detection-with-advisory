@@ -1,12 +1,21 @@
 # Desktop Application Dependencies
+# The desktop app embeds the real Flask/React dashboard in a QWebEngineView
+# rather than a separate PyQt6 widget UI, so PyQt6-WebEngine is required.
+# Its Qt6 bindings must stay in lockstep with PyQt6-Qt6's version (6.7.x) —
+# newer WebEngine releases pull a mismatched Qt6 runtime and fail to import
+# with a DLL/procedure-not-found error on Windows.
 PyQt6==6.7.0
-PyQt6-Charts==6.7.0
+PyQt6-WebEngine==6.7.0
 PyQt6-sip==13.8.0
 
-# Core dependencies (from requirements.txt)
+# Core dependencies (from requirements.txt) — the desktop launcher runs the
+# same Flask/SocketIO backend in-process, so these must be installed too.
 psutil==6.0.0
 requests==2.31.0
 PyYAML==6.0.1
+Flask>=3.0
+Flask-Cors>=4.0
+Flask-SocketIO>=5.3
 
 # Optional: Email/SMS/Webhooks
 twilio==9.0.4

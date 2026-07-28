@@ -176,6 +176,33 @@
   html {
     @apply font-sans;
     }
+
+  /* Chromium/WebKit scrollbars (also renders in the desktop app's
+     QtWebEngine view, which otherwise falls back to a default light
+     scrollbar that clashes with the dark theme). Firefox is covered
+     separately since it doesn't support ::-webkit-scrollbar. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--muted-foreground);
+    opacity: 0.4;
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--foreground);
+    background-clip: padding-box;
+  }
 }
 
 @layer utilities {
