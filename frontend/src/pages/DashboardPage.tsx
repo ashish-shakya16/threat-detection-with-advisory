@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { AlertOctagon, AlertTriangle, AlertCircle, Info, RefreshCw, Play, Square } from 'lucide-react';
+import { Siren, TriangleAlert, CircleAlert, Info, RefreshCw, Play, Square } from 'lucide-react';
 import { TopBar } from '@/components/layout/TopBar';
 import { StatCard } from '@/components/StatCard';
 import { ThreatTable } from '@/components/ThreatTable';
@@ -85,21 +85,21 @@ export default function DashboardPage() {
               <StatCard
                 label="Critical Threats"
                 value={bySeverity.critical ?? 0}
-                icon={AlertOctagon}
+                icon={Siren}
                 colorClass="bg-danger-solid text-solid-foreground"
                 helper={(bySeverity.critical ?? 0) > 0 ? 'requires action' : 'none active'}
               />
               <StatCard
                 label="High Severity"
                 value={bySeverity.high ?? 0}
-                icon={AlertCircle}
+                icon={TriangleAlert}
                 colorClass="bg-warning-solid text-solid-foreground"
                 helper="last 24 hours"
               />
               <StatCard
                 label="Medium Severity"
                 value={bySeverity.medium ?? 0}
-                icon={AlertTriangle}
+                icon={CircleAlert}
                 colorClass="bg-info-solid text-solid-foreground"
                 helper="last 24 hours"
               />

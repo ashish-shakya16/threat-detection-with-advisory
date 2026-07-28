@@ -10,7 +10,7 @@ import {
   AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import {
-  TrendingUp, Download, RefreshCw, AlertOctagon, Flame, CalendarClock,
+  TrendingUp, Download, RefreshCw, ShieldAlert, Siren, Flame, CalendarClock,
 } from 'lucide-react';
 import { AllClearIllustration } from '@/components/GuardMark';
 import { cn } from '@/lib/utils';
@@ -363,7 +363,7 @@ export default function AnalyticsPage() {
             <Card className="hover-lift border-border">
               <CardContent className="flex items-start gap-3 p-5">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-info-solid text-solid-foreground">
-                  <TrendingUp className="h-5 w-5" />
+                  <ShieldAlert className="h-5 w-5" />
                 </div>
                 <div>
                   <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total Threats</div>
@@ -378,7 +378,7 @@ export default function AnalyticsPage() {
             <Card className="hover-lift border-border">
               <CardContent className="flex items-start gap-3 p-5">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-danger-solid text-solid-foreground">
-                  <AlertOctagon className="h-5 w-5" />
+                  <Siren className="h-5 w-5" />
                 </div>
                 <div>
                   <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Active Critical</div>
