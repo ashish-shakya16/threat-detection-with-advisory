@@ -367,7 +367,7 @@ export default function AnalyticsPage() {
                 </div>
                 <div>
                   <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total Threats</div>
-                  <div className="data-numeral mt-1 text-3xl font-semibold tracking-tight"><AnimatedNumber value={stats?.total_threats ?? 0} /></div>
+                  <div className="data-numeral mt-1 flex h-9 items-center text-3xl font-semibold tracking-tight"><AnimatedNumber value={stats?.total_threats ?? 0} /></div>
                   <div className="mt-0.5 text-xs text-muted-foreground">over the last {stats?.time_window_hours ?? 24}h</div>
                 </div>
               </CardContent>
@@ -382,7 +382,7 @@ export default function AnalyticsPage() {
                 </div>
                 <div>
                   <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Active Critical</div>
-                  <div className="data-numeral mt-1 text-3xl font-semibold tracking-tight"><AnimatedNumber value={stats?.active_critical ?? 0} /></div>
+                  <div className="data-numeral mt-1 flex h-9 items-center text-3xl font-semibold tracking-tight"><AnimatedNumber value={stats?.active_critical ?? 0} /></div>
                   <div className="mt-0.5 text-xs text-muted-foreground">
                     {(stats?.active_critical ?? 0) > 0 ? 'needs attention' : 'all clear'}
                   </div>
@@ -399,7 +399,7 @@ export default function AnalyticsPage() {
                 </div>
                 <div>
                   <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Most Common</div>
-                  <div className="text-xl font-semibold tracking-tight leading-tight">{mostCommonCategory}</div>
+                  <div className="mt-1 flex h-9 items-center truncate text-2xl font-semibold tracking-tight">{mostCommonCategory}</div>
                   <div className="mt-0.5 text-xs text-muted-foreground">{mostCommonShare}% of all threats</div>
                 </div>
               </CardContent>
@@ -409,12 +409,12 @@ export default function AnalyticsPage() {
           <motion.div {...cardMotion} transition={{ duration: 0.3, delay: 0.3 }}>
             <Card className="hover-lift border-border">
               <CardContent className="flex items-start gap-3 p-5">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary-solid text-solid-foreground">
                   <CalendarClock className="h-5 w-5" />
                 </div>
                 <div>
                   <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Time Window</div>
-                  <div className="data-numeral mt-1 text-3xl font-semibold tracking-tight">{stats?.time_window_hours ?? 24}h</div>
+                  <div className="data-numeral mt-1 flex h-9 items-center text-3xl font-semibold tracking-tight">{stats?.time_window_hours ?? 24}h</div>
                   <div className="mt-0.5 text-xs text-muted-foreground">current filter</div>
                 </div>
               </CardContent>

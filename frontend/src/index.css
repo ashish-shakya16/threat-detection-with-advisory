@@ -51,6 +51,7 @@
     --color-warning-solid: var(--color-warning-solid);
     --color-danger-solid: var(--color-danger-solid);
     --color-info-solid: var(--color-info-solid);
+    --color-primary-solid: var(--color-primary-solid);
     --color-solid-foreground: var(--color-solid-foreground);
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
@@ -110,6 +111,7 @@
     --color-warning-solid: oklch(0.6 0.16 65);
     --color-danger-solid: oklch(0.55 0.19 25);
     --color-info-solid: oklch(0.56 0.12 250);
+    --color-primary-solid: oklch(0.46 0.09 199);
     --color-solid-foreground: oklch(0.99 0 0);
 }
 
@@ -159,6 +161,7 @@
     --color-warning-solid: oklch(0.58 0.15 65);
     --color-danger-solid: oklch(0.53 0.18 22);
     --color-info-solid: oklch(0.5 0.1 245);
+    --color-primary-solid: oklch(0.5 0.1 195);
     --color-solid-foreground: oklch(0.99 0 0);
     --color-accent-subtle: oklch(0.27 0.03 195);
 }

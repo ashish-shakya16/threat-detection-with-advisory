@@ -9,6 +9,8 @@ export interface Threat {
   source: string;
   description: string;
   detected_at: string;
+  last_seen_at?: string;
+  occurrence_count?: number;
   status: 'active' | 'resolved' | 'ignored' | 'escalated';
   advisory?: Advisory | null;
 }

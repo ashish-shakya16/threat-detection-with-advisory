@@ -110,11 +110,19 @@ class DatabaseManager:
                 )
             ''')
 
+        # Migrate existing databases created before occurrence tracking existed
+        existing_columns = {row[1] for row in cursor.execute('PRAGMA table_info(threats)').fetchall()}
+        if 'occurrence_count' not in existing_columns:
+            cursor.execute('ALTER TABLE threats ADD COLUMN occurrence_count INTEGER DEFAULT 1')
+        if 'last_seen_at' not in existing_columns:
+            cursor.execute('ALTER TABLE threats ADD COLUMN last_seen_at TIMESTAMP')
+            cursor.execute('UPDATE threats SET last_seen_at = detected_at WHERE last_seen_at IS NULL')
+
         conn.commit()
         conn.close()
 
         self.logger.info(f"Database initialized at {self.db_path}")
-    
+
     def log_threat(self, threat_data: Dict[str, Any]) -> int:
         """
         Log a detected threat to the database.
@@ -134,8 +142,9 @@ class DatabaseManager:
             cursor.execute('''
                 INSERT INTO threats (
                     threat_name, category, severity,
-                    risk_level, risk_score, confidence, source, description
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    risk_level, risk_score, confidence, source, description,
+                    last_seen_at, occurrence_count
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 1)
             ''', (
                 threat_data.get('threat_name'),
                 threat_data.get('category'),
@@ -151,6 +160,69 @@ class DatabaseManager:
             conn.commit()
             self.logger.info(f"Logged threat: {threat_data.get('threat_name')} (ID: {threat_id})")
             return threat_id
+        finally:
+            conn.close()
+
+    def find_active_recurring_threat(self, threat_name: str, source: str, within_minutes: int = 5) -> Optional[Dict[str, Any]]:
+        """
+        Find an active threat with the same name/source last seen within the
+        given time window, so a repeat detection can be merged into it
+        instead of creating a duplicate row.
+
+        Args:
+            threat_name: Threat name to match
+            source: Threat source to match
+            within_minutes: How recently the threat must have last fired to count as still ongoing
+
+        Returns:
+            The matching threat row, or None if no ongoing match exists
+        """
+        conn = sqlite3.connect(self.db_path)
+        try:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            # last_seen_at/detected_at are written via SQLite's CURRENT_TIMESTAMP,
+            # which is UTC — compare against another UTC-based cutoff computed
+            # in SQL rather than a Python datetime.now() (local time), which
+            # would silently never match if the local timezone is ahead of UTC.
+            cursor.execute('''
+                SELECT * FROM threats
+                WHERE threat_name = ? AND source = ? AND status = 'active'
+                      AND last_seen_at > datetime('now', ?)
+                ORDER BY last_seen_at DESC
+                LIMIT 1
+            ''', (threat_name, source, f'-{within_minutes} minutes'))
+
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        finally:
+            conn.close()
+
+    def bump_threat_occurrence(self, threat_id: int, risk_score: float, risk_level: str) -> None:
+        """
+        Record another occurrence of an already-logged, still-ongoing threat:
+        bumps occurrence_count and last_seen_at, and refreshes the risk score
+        so a worsening/improving condition is reflected without spawning a
+        duplicate row.
+
+        Args:
+            threat_id: ID of the existing threat row to update
+            risk_score: Latest risk score for this occurrence
+            risk_level: Latest risk level for this occurrence
+        """
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE threats
+                SET occurrence_count = occurrence_count + 1,
+                    last_seen_at = CURRENT_TIMESTAMP,
+                    risk_score = ?,
+                    risk_level = ?
+                WHERE id = ?
+            ''', (risk_score, risk_level, threat_id))
+            conn.commit()
         finally:
             conn.close()
 

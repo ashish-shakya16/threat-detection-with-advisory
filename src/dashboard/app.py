@@ -107,6 +107,7 @@ db = DatabaseManager(os.environ.get('THREAT_DB_PATH') or config.get('database.pa
 system_monitor = SystemMonitor(config.config)
 network_monitor = NetworkMonitor(config.config)
 rule_engine = RuleEngine(rules_data)
+RECURRING_THREAT_WINDOW_MINUTES = config.get('monitoring.recurring_threat_window_minutes', 5)
 risk_scorer = RiskScorer(config.config)
 advisor = SecurityAdvisor(rules_data['advisory_templates'], config.config)
 ai_assistant = AIAssistant(db, config.config)
@@ -327,8 +328,10 @@ def start_scan():
         threats_detected = perform_scan()
         return jsonify({
             'success': True,
-            'message': f'Scan complete: {len(threats_detected)} threats detected',
-            'threats': threats_detected
+            'data': {
+                'message': f'Scan complete: {len(threats_detected)} threats detected',
+                'threats': threats_detected
+            }
         })
     except Exception as e:
         logger.error(f"Error during scan: {e}")
@@ -361,12 +364,12 @@ def start_monitoring():
         monitor_thread.start()
         return jsonify({
             'success': True,
-            'message': 'Monitoring started'
+            'data': {'message': 'Monitoring started'}
         })
     else:
         return jsonify({
-            'success': False,
-            'message': 'Monitoring already active'
+            'success': True,
+            'data': {'message': 'Monitoring already active'}
         })
 
 @app.route('/api/monitoring/stop', methods=['POST'])
@@ -379,12 +382,12 @@ def stop_monitoring():
         monitoring_active = False
         return jsonify({
             'success': True,
-            'message': 'Monitoring stopped'
+            'data': {'message': 'Monitoring stopped'}
         })
     else:
         return jsonify({
-            'success': False,
-            'message': 'Monitoring not active'
+            'success': True,
+            'data': {'message': 'Monitoring not active'}
         })
 
 @app.route('/api/assistant/chat', methods=['POST'])
@@ -457,22 +460,38 @@ def perform_scan():
                     threat_with_risk, {'off_hours': True}
                 )
 
-            # Step 4: Generate advisory
-            advisory = advisor.generate_advisory(threat_with_risk)
-            
-            # Step 5: Log to database
-            threat_id = db.log_threat(threat_with_risk)
-            if advisory:
-                db.log_advisory(threat_id, advisory)
-            
-            all_threats.append({
-                'id': threat_id,
-                'name': threat_with_risk['threat_name'],
-                'severity': threat_with_risk['severity'],
-                'risk_level': threat_with_risk.get('risk_level', 'Unknown'),
-                'risk_score': threat_with_risk.get('risk_score', 0),
-                'timestamp': threat_with_risk['timestamp']
-            })
+            # Step 4: Merge into an existing ongoing threat if the same
+            # threat/source is still active, instead of logging a fresh row
+            # every scan cycle (an unchanged condition like sustained high
+            # CPU would otherwise flood the threats table with duplicates).
+            recurring = db.find_active_recurring_threat(
+                threat_with_risk['threat_name'],
+                threat_with_risk.get('source', 'Unknown'),
+                within_minutes=RECURRING_THREAT_WINDOW_MINUTES
+            )
+
+            if recurring:
+                db.bump_threat_occurrence(
+                    recurring['id'],
+                    threat_with_risk.get('risk_score', recurring['risk_score']),
+                    threat_with_risk.get('risk_level', recurring['risk_level'])
+                )
+                threat_id = recurring['id']
+            else:
+                # Step 5: Generate advisory and log as a new threat
+                advisory = advisor.generate_advisory(threat_with_risk)
+                threat_id = db.log_threat(threat_with_risk)
+                if advisory:
+                    db.log_advisory(threat_id, advisory)
+
+                all_threats.append({
+                    'id': threat_id,
+                    'name': threat_with_risk['threat_name'],
+                    'severity': threat_with_risk['severity'],
+                    'risk_level': threat_with_risk.get('risk_level', 'Unknown'),
+                    'risk_score': threat_with_risk.get('risk_score', 0),
+                    'timestamp': threat_with_risk['timestamp']
+                })
     
     return all_threats
 

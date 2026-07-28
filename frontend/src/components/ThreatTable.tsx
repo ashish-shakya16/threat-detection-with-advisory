@@ -43,7 +43,7 @@ export function ThreatTable({ threats, onRowClick }: ThreatTableProps) {
           <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Threat Name</TableHead>
           <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Category</TableHead>
           <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Risk Score</TableHead>
-          <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Detected</TableHead>
+          <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Last Seen</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -54,7 +54,16 @@ export function ThreatTable({ threats, onRowClick }: ThreatTableProps) {
             onClick={() => onRowClick?.(threat)}
           >
             <TableCell className="py-3"><SeverityBadge severity={threat.severity} /></TableCell>
-            <TableCell className="py-3 font-medium">{threat.threat_name}</TableCell>
+            <TableCell className="py-3 font-medium">
+              <div className="flex items-center gap-2">
+                <span>{threat.threat_name}</span>
+                {!!threat.occurrence_count && threat.occurrence_count > 1 && (
+                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                    ×{threat.occurrence_count}
+                  </span>
+                )}
+              </div>
+            </TableCell>
             <TableCell className="py-3 text-muted-foreground">{threat.category}</TableCell>
             <TableCell className="py-3">
               <div className="flex items-center gap-2">
@@ -67,7 +76,9 @@ export function ThreatTable({ threats, onRowClick }: ThreatTableProps) {
                 <span className="data-numeral text-xs text-muted-foreground">{threat.risk_score.toFixed(2)}</span>
               </div>
             </TableCell>
-            <TableCell className="py-3 text-muted-foreground">{formatDetectedAt(threat.detected_at)}</TableCell>
+            <TableCell className="py-3 text-muted-foreground">
+              {formatDetectedAt(threat.last_seen_at || threat.detected_at)}
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>

@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS threats (
     source TEXT,
     description TEXT,
     detected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    occurrence_count INTEGER DEFAULT 1,
     status TEXT DEFAULT 'active',
     FOREIGN KEY (device_id) REFERENCES devices(id)
 );

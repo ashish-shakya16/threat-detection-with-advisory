@@ -13,6 +13,11 @@ monitoring:
   system_check_interval: 5
   network_check_interval: 10
   file_check_interval: 30
+
+  # If the same threat (same name + source) is still active and was last
+  # seen within this many minutes, a new detection updates that threat's
+  # occurrence count/last-seen time instead of creating a duplicate row.
+  recurring_threat_window_minutes: 5
   
   # System monitoring settings
   system:
