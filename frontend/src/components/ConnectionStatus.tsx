@@ -18,14 +18,14 @@ export function ConnectionStatus() {
   }, []);
 
   return (
-    <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-muted/40 px-3 py-2.5 text-sm">
+    <div className="flex items-center gap-2.5 rounded-md border border-border bg-muted/50 px-3 py-2.5 text-sm">
       <span className="relative flex h-2 w-2">
-        <span
-          className={`absolute inline-flex h-full w-full animate-ping rounded-full ${connected ? 'bg-success' : 'bg-warning'} opacity-60`}
-        />
+        {connected && (
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
+        )}
         <span className={`relative inline-flex h-2 w-2 rounded-full ${connected ? 'bg-success' : 'bg-warning'}`} />
       </span>
-      <span className="font-medium text-muted-foreground">{connected ? 'Connected' : 'Connecting...'}</span>
+      <span className="font-medium text-muted-foreground">{connected ? 'Connected' : 'Connecting…'}</span>
     </div>
   );
 }

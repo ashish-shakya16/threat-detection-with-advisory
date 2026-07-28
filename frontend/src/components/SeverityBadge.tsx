@@ -1,10 +1,10 @@
 import { cn } from '@/lib/utils';
 
 const severityStyles: Record<string, string> = {
-  critical: 'bg-red-600/15 text-red-500 border-red-600/30',
-  high: 'bg-orange-600/15 text-orange-500 border-orange-600/30',
-  medium: 'bg-amber-500/15 text-amber-500 border-amber-500/30',
-  low: 'bg-blue-500/15 text-blue-500 border-blue-500/30',
+  critical: 'bg-danger/12 text-danger border-danger/30',
+  high: 'bg-warning/12 text-warning border-warning/30',
+  medium: 'bg-info/12 text-info border-info/30',
+  low: 'bg-muted text-muted-foreground border-border',
 };
 
 export function SeverityBadge({ severity }: { severity: string }) {

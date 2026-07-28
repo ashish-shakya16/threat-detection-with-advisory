@@ -40,10 +40,18 @@
     --color-foreground: var(--foreground);
     --color-background: var(--background);
     --color-success: var(--color-success);
+    --color-success-bg: var(--color-success-bg);
     --color-warning: var(--color-warning);
+    --color-warning-bg: var(--color-warning-bg);
     --color-danger: var(--color-danger);
+    --color-danger-bg: var(--color-danger-bg);
     --color-info: var(--color-info);
-    --color-accent-purple: var(--color-accent-purple);
+    --color-accent-subtle: var(--color-accent-subtle);
+    --color-success-solid: var(--color-success-solid);
+    --color-warning-solid: var(--color-warning-solid);
+    --color-danger-solid: var(--color-danger-solid);
+    --color-info-solid: var(--color-info-solid);
+    --color-solid-foreground: var(--color-solid-foreground);
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -54,80 +62,105 @@
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
+    /* Guard station — light theme: calm neutrals, teal accent spent only on action/status */
+    --background: oklch(0.97 0.002 247);
+    --foreground: oklch(0.2 0.014 254);
     --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
+    --card-foreground: oklch(0.2 0.014 254);
     --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.875rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --popover-foreground: oklch(0.2 0.014 254);
+    --primary: oklch(0.5 0.078 199);
+    --primary-foreground: oklch(0.99 0 0);
+    --secondary: oklch(0.94 0.004 247);
+    --secondary-foreground: oklch(0.2 0.014 254);
+    --muted: oklch(0.94 0.004 247);
+    --muted-foreground: oklch(0.44 0.014 254);
+    --accent: oklch(0.92 0.03 190);
+    --accent-foreground: oklch(0.3 0.06 195);
+    --destructive: oklch(0.5 0.15 25);
+    --border: oklch(0.9 0.006 247);
+    --input: oklch(0.9 0.006 247);
+    --ring: oklch(0.5 0.078 199 / 45%);
+    --chart-1: oklch(0.5 0.078 199);
+    --chart-2: oklch(0.6 0.14 200);
+    --chart-3: oklch(0.55 0.18 25);
+    --chart-4: oklch(0.65 0.14 75);
+    --chart-5: oklch(0.44 0.014 254);
+    --radius: 0.625rem;
+    --sidebar: oklch(1 0 0);
+    --sidebar-foreground: oklch(0.2 0.014 254);
+    --sidebar-primary: oklch(0.5 0.078 199);
+    --sidebar-primary-foreground: oklch(0.99 0 0);
+    --sidebar-accent: oklch(0.92 0.03 190);
+    --sidebar-accent-foreground: oklch(0.3 0.06 195);
+    --sidebar-border: oklch(0.9 0.006 247);
+    --sidebar-ring: oklch(0.5 0.078 199 / 45%);
+
+    --color-success: oklch(0.53 0.12 155);
+    --color-success-bg: oklch(0.93 0.045 155);
+    --color-warning: oklch(0.55 0.12 65);
+    --color-warning-bg: oklch(0.94 0.06 80);
+    --color-danger: oklch(0.5 0.15 25);
+    --color-danger-bg: oklch(0.93 0.045 22);
+    --color-info: oklch(0.52 0.09 250);
+    --color-accent-subtle: oklch(0.92 0.03 190);
+
+    /* Solid-fill variants for icon tiles (stronger chroma, paired with a light fixed foreground) */
+    --color-success-solid: oklch(0.56 0.15 155);
+    --color-warning-solid: oklch(0.6 0.16 65);
+    --color-danger-solid: oklch(0.55 0.19 25);
+    --color-info-solid: oklch(0.56 0.12 250);
+    --color-solid-foreground: oklch(0.99 0 0);
 }
 
 .dark {
-    /* Premium enterprise dark theme: deep navy base (#0B1220), blue/purple accents */
-    --background: oklch(0.16 0.025 260);
-    --foreground: oklch(0.98 0 0);
-    --card: oklch(0.205 0.025 260);
-    --card-foreground: oklch(0.98 0 0);
-    --popover: oklch(0.2 0.025 260);
-    --popover-foreground: oklch(0.98 0 0);
-    --primary: oklch(0.62 0.19 264);
-    --primary-foreground: oklch(0.99 0 0);
-    --secondary: oklch(0.27 0.02 260);
-    --secondary-foreground: oklch(0.98 0 0);
-    --muted: oklch(0.24 0.02 260);
-    --muted-foreground: oklch(0.66 0.01 260);
-    --accent: oklch(0.27 0.03 264);
-    --accent-foreground: oklch(0.98 0 0);
-    --destructive: oklch(0.64 0.21 25);
+    /* Guard station — dark theme: graphite, not black; teal accent, no neon glow */
+    --background: oklch(0.19 0.006 254);
+    --foreground: oklch(0.94 0.004 247);
+    --card: oklch(0.22 0.006 254);
+    --card-foreground: oklch(0.94 0.004 247);
+    --popover: oklch(0.24 0.007 254);
+    --popover-foreground: oklch(0.94 0.004 247);
+    --primary: oklch(0.68 0.09 195);
+    --primary-foreground: oklch(0.16 0.01 254);
+    --secondary: oklch(0.28 0.007 254);
+    --secondary-foreground: oklch(0.94 0.004 247);
+    --muted: oklch(0.26 0.007 254);
+    --muted-foreground: oklch(0.65 0.012 254);
+    --accent: oklch(0.27 0.03 195);
+    --accent-foreground: oklch(0.85 0.05 190);
+    --destructive: oklch(0.62 0.16 20);
     --border: oklch(1 0 0 / 8%);
     --input: oklch(1 0 0 / 12%);
-    --ring: oklch(0.62 0.19 264 / 50%);
-    --chart-1: oklch(0.64 0.21 25);
-    --chart-2: oklch(0.7 0.17 55);
-    --chart-3: oklch(0.77 0.15 85);
-    --chart-4: oklch(0.65 0.18 250);
-    --chart-5: oklch(0.62 0.19 264);
-    --sidebar: oklch(0.18 0.025 260);
-    --sidebar-foreground: oklch(0.98 0 0);
-    --sidebar-primary: oklch(0.62 0.19 264);
-    --sidebar-primary-foreground: oklch(0.99 0 0);
-    --sidebar-accent: oklch(0.26 0.03 264);
-    --sidebar-accent-foreground: oklch(0.98 0 0);
+    --ring: oklch(0.68 0.09 195 / 45%);
+    --chart-1: oklch(0.68 0.09 195);
+    --chart-2: oklch(0.72 0.13 190);
+    --chart-3: oklch(0.62 0.16 20);
+    --chart-4: oklch(0.72 0.12 75);
+    --chart-5: oklch(0.65 0.012 254);
+    --sidebar: oklch(0.21 0.006 254);
+    --sidebar-foreground: oklch(0.94 0.004 247);
+    --sidebar-primary: oklch(0.68 0.09 195);
+    --sidebar-primary-foreground: oklch(0.16 0.01 254);
+    --sidebar-accent: oklch(0.27 0.03 195);
+    --sidebar-accent-foreground: oklch(0.85 0.05 190);
     --sidebar-border: oklch(1 0 0 / 8%);
-    --sidebar-ring: oklch(0.62 0.19 264 / 50%);
+    --sidebar-ring: oklch(0.68 0.09 195 / 45%);
 
-    /* Extended semantic tokens for the premium redesign (glow/glass utilities) */
-    --color-success: oklch(0.72 0.19 149);
-    --color-warning: oklch(0.77 0.15 75);
-    --color-danger: oklch(0.64 0.21 25);
-    --color-info: oklch(0.74 0.13 230);
-    --color-accent-purple: oklch(0.6 0.22 295);
+    --color-success: oklch(0.78 0.16 150);
+    --color-success-bg: oklch(0.28 0.045 150);
+    --color-warning: oklch(0.76 0.13 75);
+    --color-warning-bg: oklch(0.3 0.05 75);
+    --color-danger: oklch(0.68 0.15 20);
+    --color-danger-bg: oklch(0.28 0.05 20);
+    --color-info: oklch(0.72 0.08 240);
+
+    --color-success-solid: oklch(0.5 0.14 155);
+    --color-warning-solid: oklch(0.58 0.15 65);
+    --color-danger-solid: oklch(0.53 0.18 22);
+    --color-info-solid: oklch(0.5 0.1 245);
+    --color-solid-foreground: oklch(0.99 0 0);
+    --color-accent-subtle: oklch(0.27 0.03 195);
 }
 
 @layer base {
@@ -136,9 +169,8 @@
     }
   body {
     @apply bg-background text-foreground;
-    background-image:
-      radial-gradient(ellipse 80% 50% at 20% -10%, oklch(0.62 0.19 264 / 18%), transparent),
-      radial-gradient(ellipse 60% 40% at 100% 0%, oklch(0.6 0.22 295 / 12%), transparent);
+    /* Faint fixed grain — a guard station is quiet, not flat-dead; no color, no glow */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90' viewBox='0 0 90 90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
     background-attachment: fixed;
     }
   html {
@@ -147,17 +179,11 @@
 }
 
 @layer utilities {
-  .glass-panel {
-    @apply bg-card/60 backdrop-blur-xl;
-  }
-  .glow-border {
-    box-shadow: 0 0 0 1px var(--glow-color, oklch(0.62 0.19 264 / 25%)), 0 8px 24px -8px var(--glow-color, oklch(0.62 0.19 264 / 25%));
-  }
   .hover-lift {
     @apply transition-all duration-200 ease-out;
   }
   .hover-lift:hover {
-    transform: translateY(-2px);
+    transform: translateY(-1px);
   }
   .data-numeral {
     font-variant-numeric: tabular-nums;

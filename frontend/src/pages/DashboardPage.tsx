@@ -79,13 +79,37 @@ export default function DashboardPage() {
       <div className="space-y-6 p-8">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {statsLoading ? (
-            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)
+            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-lg" />)
           ) : (
             <>
-              <StatCard label="Critical Threats" value={bySeverity.critical ?? 0} icon={AlertOctagon} colorClass="bg-danger/15 text-danger" />
-              <StatCard label="High Severity" value={bySeverity.high ?? 0} icon={AlertCircle} colorClass="bg-warning/15 text-warning" />
-              <StatCard label="Medium Severity" value={bySeverity.medium ?? 0} icon={AlertTriangle} colorClass="bg-info/15 text-info" />
-              <StatCard label="Low Severity" value={bySeverity.low ?? 0} icon={Info} colorClass="bg-success/15 text-success" />
+              <StatCard
+                label="Critical Threats"
+                value={bySeverity.critical ?? 0}
+                icon={AlertOctagon}
+                colorClass="bg-danger-solid text-solid-foreground"
+                helper={(bySeverity.critical ?? 0) > 0 ? 'requires action' : 'none active'}
+              />
+              <StatCard
+                label="High Severity"
+                value={bySeverity.high ?? 0}
+                icon={AlertCircle}
+                colorClass="bg-warning-solid text-solid-foreground"
+                helper="last 24 hours"
+              />
+              <StatCard
+                label="Medium Severity"
+                value={bySeverity.medium ?? 0}
+                icon={AlertTriangle}
+                colorClass="bg-info-solid text-solid-foreground"
+                helper="last 24 hours"
+              />
+              <StatCard
+                label="Low Severity"
+                value={bySeverity.low ?? 0}
+                icon={Info}
+                colorClass="bg-muted-foreground text-background"
+                helper="last 24 hours"
+              />
             </>
           )}
         </div>
@@ -105,10 +129,10 @@ export default function DashboardPage() {
                   labelStyle={{ color: 'var(--foreground)' }}
                 />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Line type="monotone" dataKey="critical" stroke="#dc2626" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
-                <Line type="monotone" dataKey="high" stroke="#ea580c" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
-                <Line type="monotone" dataKey="medium" stroke="#f59e0b" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
-                <Line type="monotone" dataKey="low" stroke="#3b82f6" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
+                <Line type="monotone" dataKey="critical" stroke="var(--color-danger)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                <Line type="monotone" dataKey="high" stroke="var(--color-warning)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                <Line type="monotone" dataKey="medium" stroke="var(--color-info)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                <Line type="monotone" dataKey="low" stroke="var(--muted-foreground)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>

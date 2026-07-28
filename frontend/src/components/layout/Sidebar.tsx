@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, ShieldAlert, LineChart, Bot, Settings } from 'lucide-react';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
+import { GuardMark } from '@/components/GuardMark';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -13,15 +14,16 @@ const navItems = [
 
 export function Sidebar() {
   return (
-    <nav className="fixed left-4 top-4 bottom-4 flex w-64 flex-col rounded-2xl border border-border/60 glass-panel shadow-2xl shadow-black/40">
-      <div className="flex items-center gap-3 p-5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-primary to-accent-purple shadow-lg shadow-primary/30">
-          <img src="/favicon.svg" alt="" className="h-5 w-5" />
+    <nav className="fixed left-4 top-4 bottom-4 flex w-64 flex-col rounded-lg border border-sidebar-border bg-sidebar">
+      <div className="flex items-center gap-2.5 border-b border-sidebar-border p-5">
+        <GuardMark className="h-7 w-7 text-primary" />
+        <div>
+          <h2 className="text-sm font-semibold tracking-tight text-sidebar-foreground">SecureX</h2>
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Guard Station</p>
         </div>
-        <h2 className="text-lg font-bold tracking-tight">SecureX</h2>
       </div>
 
-      <ul className="flex-1 space-y-1 px-3 py-2">
+      <ul className="flex-1 space-y-0.5 px-3 py-3">
         {navItems.map(({ to, label, icon: Icon, end }) => (
           <li key={to}>
             <NavLink
@@ -29,22 +31,17 @@ export function Sidebar() {
               end={end}
               className={({ isActive }) =>
                 cn(
-                  'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-accent/60 hover:text-foreground',
-                  isActive &&
-                    'bg-linear-to-r from-primary to-accent-purple text-primary-foreground shadow-lg shadow-primary/25 hover:from-primary hover:to-accent-purple hover:text-primary-foreground'
+                  'relative flex items-center gap-3 rounded-md px-3 py-2 pl-4 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                  isActive && 'bg-sidebar-accent text-sidebar-accent-foreground'
                 )
               }
             >
               {({ isActive }) => (
                 <>
-                  <div
-                    className={cn(
-                      'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
-                      isActive ? 'bg-white/15' : 'bg-muted/50 group-hover:bg-muted'
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </div>
+                  {isActive && (
+                    <span className="absolute inset-y-1 left-0 w-0.75 rounded-full bg-primary" />
+                  )}
+                  <Icon className="h-4 w-4 shrink-0" />
                   <span>{label}</span>
                 </>
               )}

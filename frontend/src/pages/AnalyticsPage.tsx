@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { TopBar } from '@/components/layout/TopBar';
@@ -10,17 +10,36 @@ import {
   AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import {
-  TrendingUp, Download, RefreshCw, ShieldCheck, AlertOctagon, Flame, CalendarClock,
+  TrendingUp, Download, RefreshCw, AlertOctagon, Flame, CalendarClock,
 } from 'lucide-react';
+import { AllClearIllustration } from '@/components/GuardMark';
 import { cn } from '@/lib/utils';
 
-const CATEGORY_COLORS = ['#4F7EFF', '#38BDF8', '#22C55E', '#FACC15', '#EF4444', '#7C5CFF'];
-const RISK_COLORS: Record<string, string> = {
-  Critical: '#EF4444',
-  High: '#F97316',
-  Medium: '#FACC15',
-  Low: '#3B82F6',
+const CATEGORY_COLOR_VARS = ['--primary', '--color-info', '--color-warning', '--color-danger', '--muted-foreground', '--chart-2'];
+const RISK_COLOR_VARS: Record<string, string> = {
+  Critical: '--color-danger',
+  High: '--color-warning',
+  Medium: '--color-info',
+  Low: '--muted-foreground',
 };
+
+/** Recharts writes `fill` as a raw SVG attribute, which can't resolve CSS custom
+ * properties reliably — resolve theme tokens to concrete color strings instead. */
+function useThemeColors() {
+  const [resolved, setResolved] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const style = getComputedStyle(document.documentElement);
+    const vars = new Set([...CATEGORY_COLOR_VARS, ...Object.values(RISK_COLOR_VARS)]);
+    const next: Record<string, string> = {};
+    vars.forEach((v) => {
+      next[v] = style.getPropertyValue(v).trim();
+    });
+    setResolved(next);
+  }, []);
+
+  return resolved;
+}
 
 const periods = [
   { label: '24 Hours', value: 1 },
@@ -64,6 +83,9 @@ function DonutLegendRow({ color, label, value, percent }: { color: string; label
 
 export default function AnalyticsPage() {
   const [days, setDays] = useState(7);
+  const themeColors = useThemeColors();
+  const categoryColors = CATEGORY_COLOR_VARS.map((v) => themeColors[v] ?? '');
+  const riskColor = (name: string) => themeColors[RISK_COLOR_VARS[name]] ?? themeColors['--muted-foreground'] ?? '';
 
   const { data: dailyTimeline, isLoading: timelineLoading, refetch: refetchTimeline, isFetching: timelineFetching } = useQuery({
     queryKey: ['analytics-timeline', days],
@@ -145,23 +167,23 @@ export default function AnalyticsPage() {
 
       <div className="space-y-6 p-8">
         <motion.div {...cardMotion} transition={{ duration: 0.3 }}>
-          <Card className="border-border/60 bg-linear-to-b from-card to-card/60">
+          <Card className="border-border">
             <CardHeader className="flex flex-row items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-accent-foreground">
                   <TrendingUp className="h-4.5 w-4.5" />
                 </div>
-                <CardTitle className="text-[1.375rem]">Threat Trends Over Time</CardTitle>
+                <CardTitle className="text-lg">Threat Trends Over Time</CardTitle>
               </div>
-              <div className="flex gap-1.5 rounded-xl border border-border/60 bg-muted/30 p-1">
+              <div className="flex gap-1 rounded-lg border border-border bg-muted/40 p-1">
                 {periods.map((p) => (
                   <Button
                     key={p.value}
                     size="sm"
                     variant="ghost"
                     className={cn(
-                      'h-7 rounded-lg px-3 text-xs',
-                      days === p.value && 'bg-linear-to-r from-primary to-accent-purple text-primary-foreground hover:from-primary hover:to-accent-purple hover:text-primary-foreground'
+                      'h-7 rounded-md px-3 text-xs',
+                      days === p.value && 'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground'
                     )}
                     onClick={() => setDays(p.value)}
                   >
@@ -172,10 +194,10 @@ export default function AnalyticsPage() {
             </CardHeader>
             <CardContent className="h-80">
               {timelineLoading ? (
-                <Skeleton className="h-full rounded-xl" />
+                <Skeleton className="h-full rounded-lg" />
               ) : (dailyTimeline ?? []).length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
-                  <ShieldCheck className="h-10 w-10" />
+                  <AllClearIllustration className="h-20 w-auto text-primary" />
                   <p>No threat activity in this period.</p>
                 </div>
               ) : (
@@ -183,30 +205,26 @@ export default function AnalyticsPage() {
                   <AreaChart data={dailyTimeline ?? []}>
                     <defs>
                       <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#4F7EFF" stopOpacity={0.45} />
-                        <stop offset="100%" stopColor="#7C5CFF" stopOpacity={0.02} />
-                      </linearGradient>
-                      <linearGradient id="areaStroke" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor="#4F7EFF" />
-                        <stop offset="100%" stopColor="#7C5CFF" />
+                        <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.35} />
+                        <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.02} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="4 6" stroke="var(--border)" vertical={false} />
                     <XAxis dataKey="date" tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }} allowDecimals={false} axisLine={false} tickLine={false} />
                     <Tooltip
-                      contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 12 }}
+                      contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8 }}
                       labelStyle={{ color: 'var(--foreground)' }}
                       cursor={{ stroke: 'var(--border)', strokeWidth: 1 }}
                     />
                     <Area
                       type="monotone"
                       dataKey="count"
-                      stroke="url(#areaStroke)"
-                      strokeWidth={2.5}
+                      stroke="var(--primary)"
+                      strokeWidth={2}
                       fill="url(#areaFill)"
-                      dot={{ r: 3, fill: '#4F7EFF', strokeWidth: 0 }}
-                      activeDot={{ r: 6 }}
+                      dot={{ r: 3, fill: 'var(--primary)', strokeWidth: 0 }}
+                      activeDot={{ r: 5 }}
                       animationDuration={600}
                     />
                   </AreaChart>
@@ -227,7 +245,7 @@ export default function AnalyticsPage() {
                   <Skeleton className="h-64 rounded-xl" />
                 ) : categoryData.length === 0 ? (
                   <div className="flex h-64 flex-col items-center justify-center gap-2 text-muted-foreground">
-                    <ShieldCheck className="h-10 w-10" />
+                    <AllClearIllustration className="h-16 w-auto text-primary" />
                     <p>No categorized threats yet.</p>
                   </div>
                 ) : (
@@ -246,10 +264,14 @@ export default function AnalyticsPage() {
                             animationDuration={700}
                           >
                             {categoryData.map((_, i) => (
-                              <Cell key={i} fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} stroke="none" />
+                              <Cell
+                                key={i}
+                                fill={categoryColors[i % categoryColors.length]}
+                                stroke="none"
+                              />
                             ))}
                           </Pie>
-                          <Tooltip contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 12 }} />
+                          <Tooltip contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8 }} />
                         </PieChart>
                       </ResponsiveContainer>
                       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
@@ -261,7 +283,7 @@ export default function AnalyticsPage() {
                       {categoryData.map((c, i) => (
                         <DonutLegendRow
                           key={c.name}
-                          color={CATEGORY_COLORS[i % CATEGORY_COLORS.length]}
+                          color={categoryColors[i % categoryColors.length]}
                           label={c.name}
                           value={c.value}
                           percent={categoryTotal ? Math.round((c.value / categoryTotal) * 100) : 0}
@@ -284,7 +306,7 @@ export default function AnalyticsPage() {
                   <Skeleton className="h-64 rounded-xl" />
                 ) : severityData.length === 0 ? (
                   <div className="flex h-64 flex-col items-center justify-center gap-2 text-muted-foreground">
-                    <ShieldCheck className="h-10 w-10" />
+                    <AllClearIllustration className="h-16 w-auto text-primary" />
                     <p>No severity data yet.</p>
                   </div>
                 ) : (
@@ -303,10 +325,14 @@ export default function AnalyticsPage() {
                             animationDuration={700}
                           >
                             {severityData.map((entry, i) => (
-                              <Cell key={i} fill={RISK_COLORS[entry.name] ?? '#94a3b8'} stroke="none" />
+                              <Cell
+                                key={i}
+                                fill={riskColor(entry.name)}
+                                stroke="none"
+                              />
                             ))}
                           </Pie>
-                          <Tooltip contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 12 }} />
+                          <Tooltip contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8 }} />
                         </PieChart>
                       </ResponsiveContainer>
                       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
@@ -318,7 +344,7 @@ export default function AnalyticsPage() {
                       {severityData.map((s) => (
                         <DonutLegendRow
                           key={s.name}
-                          color={RISK_COLORS[s.name] ?? '#94a3b8'}
+                          color={riskColor(s.name)}
                           label={s.name}
                           value={s.value}
                           percent={severityTotal ? Math.round((s.value / severityTotal) * 100) : 0}
@@ -332,34 +358,32 @@ export default function AnalyticsPage() {
           </motion.div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <motion.div {...cardMotion} transition={{ duration: 0.3, delay: 0.15 }}>
-            <Card className="hover-lift relative overflow-hidden border-border/60 bg-linear-to-br from-card to-card/40">
-              <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-info/20 opacity-30 blur-2xl" />
-              <CardContent className="relative flex items-start gap-4 p-6">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-info/15 text-info">
-                  <ShieldCheck className="h-6 w-6" />
+            <Card className="hover-lift border-border">
+              <CardContent className="flex items-start gap-3 p-5">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-info-solid text-solid-foreground">
+                  <TrendingUp className="h-5 w-5" />
                 </div>
                 <div>
-                  <div className="text-sm font-medium text-muted-foreground">Total Threats</div>
-                  <div className="data-numeral text-4xl font-semibold tracking-tight"><AnimatedNumber value={stats?.total_threats ?? 0} /></div>
-                  <div className="mt-1 text-xs text-muted-foreground">over the last {stats?.time_window_hours ?? 24}h</div>
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total Threats</div>
+                  <div className="data-numeral mt-1 text-3xl font-semibold tracking-tight"><AnimatedNumber value={stats?.total_threats ?? 0} /></div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">over the last {stats?.time_window_hours ?? 24}h</div>
                 </div>
               </CardContent>
             </Card>
           </motion.div>
 
           <motion.div {...cardMotion} transition={{ duration: 0.3, delay: 0.2 }}>
-            <Card className="hover-lift relative overflow-hidden border-border/60 bg-linear-to-br from-card to-card/40">
-              <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-danger/20 opacity-30 blur-2xl" />
-              <CardContent className="relative flex items-start gap-4 p-6">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-danger/15 text-danger">
-                  <AlertOctagon className="h-6 w-6" />
+            <Card className="hover-lift border-border">
+              <CardContent className="flex items-start gap-3 p-5">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-danger-solid text-solid-foreground">
+                  <AlertOctagon className="h-5 w-5" />
                 </div>
                 <div>
-                  <div className="text-sm font-medium text-muted-foreground">Active Critical</div>
-                  <div className="data-numeral text-4xl font-semibold tracking-tight"><AnimatedNumber value={stats?.active_critical ?? 0} /></div>
-                  <div className="mt-1 text-xs text-muted-foreground">
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Active Critical</div>
+                  <div className="data-numeral mt-1 text-3xl font-semibold tracking-tight"><AnimatedNumber value={stats?.active_critical ?? 0} /></div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">
                     {(stats?.active_critical ?? 0) > 0 ? 'needs attention' : 'all clear'}
                   </div>
                 </div>
@@ -368,32 +392,30 @@ export default function AnalyticsPage() {
           </motion.div>
 
           <motion.div {...cardMotion} transition={{ duration: 0.3, delay: 0.25 }}>
-            <Card className="hover-lift relative overflow-hidden border-border/60 bg-linear-to-br from-card to-card/40">
-              <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-warning/20 opacity-30 blur-2xl" />
-              <CardContent className="relative flex items-start gap-4 p-6">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-warning/15 text-warning">
-                  <Flame className="h-6 w-6" />
+            <Card className="hover-lift border-border">
+              <CardContent className="flex items-start gap-3 p-5">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-warning-solid text-solid-foreground">
+                  <Flame className="h-5 w-5" />
                 </div>
                 <div>
-                  <div className="text-sm font-medium text-muted-foreground">Most Common</div>
-                  <div className="text-2xl font-semibold tracking-tight leading-tight">{mostCommonCategory}</div>
-                  <div className="mt-1 text-xs text-muted-foreground">{mostCommonShare}% of all threats</div>
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Most Common</div>
+                  <div className="text-xl font-semibold tracking-tight leading-tight">{mostCommonCategory}</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">{mostCommonShare}% of all threats</div>
                 </div>
               </CardContent>
             </Card>
           </motion.div>
 
           <motion.div {...cardMotion} transition={{ duration: 0.3, delay: 0.3 }}>
-            <Card className="hover-lift relative overflow-hidden border-border/60 bg-linear-to-br from-card to-card/40">
-              <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-accent-purple/20 opacity-30 blur-2xl" />
-              <CardContent className="relative flex items-start gap-4 p-6">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-accent-purple/15 text-accent-purple">
-                  <CalendarClock className="h-6 w-6" />
+            <Card className="hover-lift border-border">
+              <CardContent className="flex items-start gap-3 p-5">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                  <CalendarClock className="h-5 w-5" />
                 </div>
                 <div>
-                  <div className="text-sm font-medium text-muted-foreground">Time Window</div>
-                  <div className="data-numeral text-4xl font-semibold tracking-tight">{stats?.time_window_hours ?? 24}h</div>
-                  <div className="mt-1 text-xs text-muted-foreground">current filter</div>
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Time Window</div>
+                  <div className="data-numeral mt-1 text-3xl font-semibold tracking-tight">{stats?.time_window_hours ?? 24}h</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">current filter</div>
                 </div>
               </CardContent>
             </Card>

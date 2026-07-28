@@ -1,7 +1,7 @@
 import type { Threat } from '@/types';
 import { SeverityBadge } from '@/components/SeverityBadge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ShieldCheck } from 'lucide-react';
+import { AllClearIllustration } from '@/components/GuardMark';
 import { cn } from '@/lib/utils';
 
 function formatDetectedAt(detectedAt: string): string {
@@ -16,7 +16,7 @@ function riskBarColor(score: number): string {
   if (score >= 0.75) return 'bg-danger';
   if (score >= 0.5) return 'bg-warning';
   if (score >= 0.25) return 'bg-info';
-  return 'bg-success';
+  return 'bg-muted-foreground/40';
 }
 
 interface ThreatTableProps {
@@ -27,9 +27,10 @@ interface ThreatTableProps {
 export function ThreatTable({ threats, onRowClick }: ThreatTableProps) {
   if (threats.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
-        <ShieldCheck className="h-10 w-10" />
-        <p>No threats detected. System is secure.</p>
+      <div className="flex flex-col items-center gap-3 py-14 text-muted-foreground">
+        <AllClearIllustration className="h-24 w-auto text-primary" />
+        <p className="text-sm font-medium text-foreground">All clear</p>
+        <p className="text-xs">No threats detected in this window.</p>
       </div>
     );
   }
