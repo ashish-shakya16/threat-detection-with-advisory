@@ -40,7 +40,7 @@ function AnimatedNumber({ value }: { value: number | string }) {
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className="tabular-nums"
+      className="data-numeral"
     >
       {value}
     </motion.span>
@@ -55,8 +55,8 @@ function DonutLegendRow({ color, label, value, percent }: { color: string; label
         <span className="text-sm text-foreground">{label}</span>
       </div>
       <div className="flex items-center gap-2 text-sm">
-        <span className="font-semibold tabular-nums">{value}</span>
-        <span className="w-10 text-right text-muted-foreground tabular-nums">{percent}%</span>
+        <span className="data-numeral font-semibold">{value}</span>
+        <span className="data-numeral w-10 text-right text-muted-foreground">{percent}%</span>
       </div>
     </div>
   );
@@ -253,7 +253,7 @@ export default function AnalyticsPage() {
                         </PieChart>
                       </ResponsiveContainer>
                       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-3xl font-bold tracking-tight"><AnimatedNumber value={categoryTotal} /></span>
+                        <span className="data-numeral text-3xl font-semibold tracking-tight"><AnimatedNumber value={categoryTotal} /></span>
                         <span className="text-xs text-muted-foreground">total</span>
                       </div>
                     </div>
@@ -310,7 +310,7 @@ export default function AnalyticsPage() {
                         </PieChart>
                       </ResponsiveContainer>
                       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-3xl font-bold tracking-tight"><AnimatedNumber value={severityTotal} /></span>
+                        <span className="data-numeral text-3xl font-semibold tracking-tight"><AnimatedNumber value={severityTotal} /></span>
                         <span className="text-xs text-muted-foreground">total</span>
                       </div>
                     </div>
@@ -342,7 +342,7 @@ export default function AnalyticsPage() {
                 </div>
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">Total Threats</div>
-                  <div className="text-4xl font-bold tracking-tight"><AnimatedNumber value={stats?.total_threats ?? 0} /></div>
+                  <div className="data-numeral text-4xl font-semibold tracking-tight"><AnimatedNumber value={stats?.total_threats ?? 0} /></div>
                   <div className="mt-1 text-xs text-muted-foreground">over the last {stats?.time_window_hours ?? 24}h</div>
                 </div>
               </CardContent>
@@ -358,7 +358,7 @@ export default function AnalyticsPage() {
                 </div>
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">Active Critical</div>
-                  <div className="text-4xl font-bold tracking-tight"><AnimatedNumber value={stats?.active_critical ?? 0} /></div>
+                  <div className="data-numeral text-4xl font-semibold tracking-tight"><AnimatedNumber value={stats?.active_critical ?? 0} /></div>
                   <div className="mt-1 text-xs text-muted-foreground">
                     {(stats?.active_critical ?? 0) > 0 ? 'needs attention' : 'all clear'}
                   </div>
@@ -376,7 +376,7 @@ export default function AnalyticsPage() {
                 </div>
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">Most Common</div>
-                  <div className="text-2xl font-bold tracking-tight leading-tight">{mostCommonCategory}</div>
+                  <div className="text-2xl font-semibold tracking-tight leading-tight">{mostCommonCategory}</div>
                   <div className="mt-1 text-xs text-muted-foreground">{mostCommonShare}% of all threats</div>
                 </div>
               </CardContent>
@@ -392,7 +392,7 @@ export default function AnalyticsPage() {
                 </div>
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">Time Window</div>
-                  <div className="text-4xl font-bold tracking-tight">{stats?.time_window_hours ?? 24}h</div>
+                  <div className="data-numeral text-4xl font-semibold tracking-tight">{stats?.time_window_hours ?? 24}h</div>
                   <div className="mt-1 text-xs text-muted-foreground">current filter</div>
                 </div>
               </CardContent>

@@ -18,7 +18,7 @@ export function StatCard({ label, value, icon: Icon, colorClass }: StatCardProps
           <Icon className="h-7 w-7" />
         </div>
         <div>
-          <div className="text-4xl font-bold tracking-tight">{value}</div>
+          <div className="data-numeral text-4xl font-semibold tracking-tight">{value}</div>
           <div className="text-sm font-medium text-muted-foreground">{label}</div>
         </div>
       </CardContent>

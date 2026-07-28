@@ -117,19 +117,19 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           <Card className="hover-lift border-border/60">
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">CPU Usage</CardTitle></CardHeader>
-            <CardContent className="text-3xl font-bold tracking-tight">{metrics?.cpu_percent?.toFixed(1) ?? '0.0'}%</CardContent>
+            <CardContent className="data-numeral text-3xl font-semibold tracking-tight">{metrics?.cpu_percent?.toFixed(1) ?? '0.0'}%</CardContent>
           </Card>
           <Card className="hover-lift border-border/60">
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Memory Usage</CardTitle></CardHeader>
-            <CardContent className="text-3xl font-bold tracking-tight">{metrics?.memory_percent?.toFixed(1) ?? '0.0'}%</CardContent>
+            <CardContent className="data-numeral text-3xl font-semibold tracking-tight">{metrics?.memory_percent?.toFixed(1) ?? '0.0'}%</CardContent>
           </Card>
           <Card className="hover-lift border-border/60">
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Network Connections</CardTitle></CardHeader>
-            <CardContent className="text-3xl font-bold tracking-tight">{metrics?.network_connections ?? 0}</CardContent>
+            <CardContent className="data-numeral text-3xl font-semibold tracking-tight">{metrics?.network_connections ?? 0}</CardContent>
           </Card>
           <Card className="hover-lift border-border/60">
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Active Processes</CardTitle></CardHeader>
-            <CardContent className="text-3xl font-bold tracking-tight">{metrics?.process_count ?? 0}</CardContent>
+            <CardContent className="data-numeral text-3xl font-semibold tracking-tight">{metrics?.process_count ?? 0}</CardContent>
           </Card>
         </div>
 

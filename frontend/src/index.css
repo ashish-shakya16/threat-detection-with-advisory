@@ -159,4 +159,8 @@
   .hover-lift:hover {
     transform: translateY(-2px);
   }
+  .data-numeral {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
 }

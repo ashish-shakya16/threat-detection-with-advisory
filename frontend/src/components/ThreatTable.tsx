@@ -63,7 +63,7 @@ export function ThreatTable({ threats, onRowClick }: ThreatTableProps) {
                     style={{ width: `${Math.min(threat.risk_score * 100, 100)}%` }}
                   />
                 </div>
-                <span className="text-xs tabular-nums text-muted-foreground">{threat.risk_score.toFixed(2)}</span>
+                <span className="data-numeral text-xs text-muted-foreground">{threat.risk_score.toFixed(2)}</span>
               </div>
             </TableCell>
             <TableCell className="py-3 text-muted-foreground">{formatDetectedAt(threat.detected_at)}</TableCell>
