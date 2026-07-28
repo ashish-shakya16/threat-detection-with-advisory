@@ -53,6 +53,44 @@ allowed_origins = os.environ.get(
     'http://localhost:5173,http://127.0.0.1:5173'
 ).split(',')
 CORS(app, origins=allowed_origins)
+
+
+def _disable_websocket_compression():
+    """
+    Stop simple-websocket from forcing permessage-deflate on every connection.
+
+    simple_websocket.ws hardcodes `AcceptConnection(extensions=[PerMessageDeflate()])`
+    without checking what the client actually offered. Browsers advertise
+    `permessage-deflate; client_max_window_bits` (the bare parameter, meaning
+    "I support this"), and wsproto answers with `client_max_window_bits=15`.
+    RFC 7692 forbids returning a value the client did not itself request, so
+    Chrome rejects the frames with "Invalid frame header"; Socket.IO then
+    silently falls back to HTTP long-polling and real-time updates lag.
+
+    Replacing AcceptConnection in that module with a version that drops the
+    extensions makes the server accept connections uncompressed, which all
+    clients handle correctly. Socket.IO payloads here are small JSON events,
+    so compression buys nothing. Guarded so an upstream fix (or a refactor of
+    that module) cannot break startup.
+    """
+    try:
+        import simple_websocket.ws as sw_ws
+    except ImportError:  # pragma: no cover - websocket transport unavailable
+        return
+
+    original_accept = getattr(sw_ws, 'AcceptConnection', None)
+    if original_accept is None:  # pragma: no cover - upstream refactor
+        return
+
+    def accept_without_compression(*args, **kwargs):
+        kwargs['extensions'] = []
+        return original_accept(*args, **kwargs)
+
+    sw_ws.AcceptConnection = accept_without_compression
+
+
+_disable_websocket_compression()
+
 socketio = SocketIO(app, cors_allowed_origins=allowed_origins)
 
 FRONTEND_DIST = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'frontend', 'dist')
