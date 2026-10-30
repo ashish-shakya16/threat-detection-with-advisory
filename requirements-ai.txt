@@ -1,0 +1,7 @@
+# Optional retrieval-augmented generation (RAG) dependencies for the AI
+# assistant. Versions below are the ones SecureX was tested with. Without
+# them the assistant falls back to keyword retrieval over the same documents.
+langchain-core==1.4.0
+langchain-text-splitters==1.1.2
+chromadb==1.5.9
+sentence-transformers==5.5.1

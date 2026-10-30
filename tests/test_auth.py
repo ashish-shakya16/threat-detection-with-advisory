@@ -111,6 +111,50 @@ class TestJsonAuthEndpoints(unittest.TestCase):
         body = response.get_json()
         self.assertFalse(body['success'])
 
+    def test_signup_saves_user_and_signs_in(self):
+        response = self.client.post('/api/auth/signup', json={
+            'username': 'newuser',
+            'email': 'New@Example.com',
+            'password': 'strongpass1'
+        })
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.get_json()['data']['username'], 'newuser')
+
+        user = self.app_module.db.get_user_by_username('newuser')
+        self.assertEqual(user['email'], 'new@example.com')
+        self.assertNotEqual(user['password_hash'], 'strongpass1')
+        self.assertTrue(verify_password(user['password_hash'], 'strongpass1'))
+
+        me = self.client.get('/api/auth/me')
+        self.assertEqual(me.get_json()['data']['username'], 'newuser')
+
+        self.client.post('/api/auth/logout')
+        login = self.client.post('/api/auth/login', json={
+            'username': 'newuser', 'password': 'strongpass1'
+        })
+        self.assertEqual(login.status_code, 200)
+
+    def test_signup_rejects_duplicate_username_or_email(self):
+        for payload in (
+            {'username': 'testadmin', 'email': 'other@example.com', 'password': 'strongpass1'},
+            {'username': 'other', 'email': 'admin@example.com', 'password': 'strongpass1'},
+        ):
+            response = self.client.post('/api/auth/signup', json=payload)
+            self.assertEqual(response.status_code, 409)
+            self.assertFalse(response.get_json()['success'])
+
+    def test_signup_validates_input(self):
+        for payload in (
+            {'username': 'ab', 'email': 'a@example.com', 'password': 'strongpass1'},
+            {'username': 'bad user', 'email': 'a@example.com', 'password': 'strongpass1'},
+            {'username': 'gooduser', 'email': 'not-an-email', 'password': 'strongpass1'},
+            {'username': 'gooduser', 'email': 'a@example.com', 'password': 'short'},
+        ):
+            response = self.client.post('/api/auth/signup', json=payload)
+            self.assertEqual(response.status_code, 400, payload)
+        self.assertIsNone(self.app_module.db.get_user_by_username('gooduser'))
+        self.assertEqual(self.client.get('/api/auth/me').status_code, 401)
+
     def test_me_returns_401_when_unauthenticated(self):
         response = self.client.get('/api/auth/me')
         self.assertEqual(response.status_code, 401)

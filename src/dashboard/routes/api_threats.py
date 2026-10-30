@@ -1,6 +1,6 @@
 """Threat management API routes."""
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 import logging
 
 from src.auth import login_required
@@ -8,6 +8,14 @@ from src.auth import login_required
 logger = logging.getLogger('securex')
 
 threats_bp = Blueprint('threats', __name__, url_prefix='/api/threats')
+
+
+def _audit(app, action, target_type='', target_id='', outcome='success', details=None):
+    """Record a dashboard action in the audit log, if one is configured."""
+    audit = app.config.get('SECUREX_AUDIT')
+    if audit:
+        audit.record(session.get('username', 'anonymous'), action, target_type, target_id,
+                     outcome, details, request.remote_addr or '')
 
 
 def init_threats_routes(db, app):
@@ -77,6 +85,7 @@ def init_threats_routes(db, app):
                 }), 400
 
             db.update_threat_status(threat_id, status)
+            _audit(app, 'threat.status_change', 'threat', threat_id, details={'status': status})
 
             return jsonify({
                 'success': True,

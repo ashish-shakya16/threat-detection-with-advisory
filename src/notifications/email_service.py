@@ -61,6 +61,9 @@ class EmailService:
         self.use_tls = config.get('use_tls', True)
         self.retry_attempts = config.get('retry_attempts', 3)
         self.retry_delay = config.get('retry_delay', 2)
+        self.timeout = config.get('timeout_seconds', 15)
+        self.use_ssl = config.get('use_ssl', int(self.smtp_port) == 465)
+        self.last_errors: Dict[str, str] = {}
 
         self.logger.info(f"EmailService initialized for {self.sender_email} on {self.smtp_server}:{self.smtp_port}")
 
@@ -118,10 +121,12 @@ class EmailService:
             try:
                 self.logger.debug(f"Sending email to {recipient} (attempt {attempt}/{self.retry_attempts})")
 
-                server = smtplib.SMTP(self.smtp_server, self.smtp_port)
-
-                if self.use_tls:
-                    server.starttls()
+                if self.use_ssl:
+                    server = smtplib.SMTP_SSL(self.smtp_server, self.smtp_port, timeout=self.timeout)
+                else:
+                    server = smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=self.timeout)
+                    if self.use_tls:
+                        server.starttls()
 
                 server.login(self.sender_email, self.sender_password)
                 server.send_message(msg)
@@ -135,7 +140,9 @@ class EmailService:
                 self.logger.error(f"{msg_text}: {str(e)}")
                 raise NotificationException(msg_text)
 
-            except smtplib.SMTPException as e:
+            except (smtplib.SMTPException, OSError) as e:
+                # Covers transient SMTP errors plus network failures such as
+                # refused connections and timeouts.
                 if attempt < self.retry_attempts:
                     self.logger.warning(f"SMTP error on attempt {attempt}: {str(e)}. Retrying in {self.retry_delay}s...")
                     time.sleep(self.retry_delay)
@@ -166,6 +173,7 @@ class EmailService:
             Dictionary mapping recipient to success status
         """
         results = {}
+        self.last_errors = {}
 
         for recipient in recipients:
             try:
@@ -174,5 +182,6 @@ class EmailService:
             except NotificationException as e:
                 self.logger.error(f"Failed to send email to {recipient}: {str(e)}")
                 results[recipient] = False
+                self.last_errors[recipient] = str(e)
 
         return results

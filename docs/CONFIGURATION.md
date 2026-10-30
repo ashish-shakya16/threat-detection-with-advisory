@@ -57,6 +57,53 @@ risk_assessment:
     high: 0.85
 ```
 
+## AI Assistant Settings
+
+```yaml
+ai:
+  enabled: false                 # true = use a language model; false = offline knowledge base
+  provider: "openai-compatible"  # or "huggingface", "ollama"
+  api_key_env: "SECUREX_AI_API_KEY"  # name of the env var holding the key
+  base_url: ""                   # optional override of the provider endpoint
+  model: "gpt-4o-mini"
+  temperature: 0.2
+  max_tokens: 600
+  timeout_seconds: 30
+  rag_enabled: true              # ChromaDB + Sentence Transformers; keyword fallback otherwise
+  embedding_model: "all-MiniLM-L6-v2"
+  chroma_path: "data/chroma_db"
+  knowledge_dir: "docs/security_knowledge"
+  max_distance: 0.65             # cosine distance cut-off; larger = looser matches
+```
+
+Install optional retrieval dependencies with `pip install -r requirements-ai.txt`.
+See the README's "AI Security Assistant" section for provider examples.
+
+## Notification Settings
+
+```yaml
+notifications:
+  enabled: false
+  notify_on_critical: true
+  notify_on_high: true
+  notify_on_medium: false
+  notify_on_low: false
+  cooldown_seconds: 300
+  recipients: []                 # trusted addresses; others are verified by email
+  smtp:
+    smtp_server: "smtp.gmail.com"
+    smtp_port: 587               # 465 switches to implicit TLS
+    sender_email_env: "SECUREX_SMTP_SENDER"
+    sender_password_env: "SECUREX_SMTP_PASSWORD"
+    use_tls: true
+    timeout_seconds: 15
+    retry_attempts: 3
+    retry_delay: 2
+```
+
+The enabled flag, severities and cooldown can also be changed in Settings. Those
+changes are stored in the database and override these values after a restart.
+
 ## Database Settings
 
 ```yaml

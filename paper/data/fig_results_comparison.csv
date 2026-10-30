@@ -1,0 +1,11 @@
+# Headline result vs. the same study's result under a stricter view (percent).
+# shone: Shone et al. (TETCI 2018), 5-class accuracy on KDD Cup 99 (97.85) vs NSL-KDD (85.42).
+# unsw_orig / unsw_nfv2: Sarhan et al. (arXiv:2101.11315v2) Table 9, weighted F1 vs lowest per-class F1
+#   (Analysis: 0.03 original features; 0.17 NetFlow-v2 features).
+# cic2018_fs / unsw_fs: Sarhan et al. Table 8, binary F1 of best vs worst feature set.
+case,label,headline,stricter
+shone,"Shone et al.: KDD 99 vs NSL-KDD (accuracy)",97.85,85.42
+unsw_orig,"UNSW-NB15, original features: weighted vs worst-class F1",98,3
+unsw_nfv2,"NF-UNSW-NB15-v2: weighted vs worst-class F1",99,17
+cic2018_fs,"CSE-CIC-IDS2018: best vs worst feature set (binary F1)",97,83
+unsw_fs,"UNSW-NB15: best vs worst feature set (binary F1)",97,85

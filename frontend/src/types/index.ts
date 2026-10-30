@@ -13,6 +13,101 @@ export interface Threat {
   occurrence_count?: number;
   status: 'active' | 'resolved' | 'ignored' | 'escalated';
   advisory?: Advisory | null;
+  /** JSON-encoded RiskContext, when the threat was scored with context. */
+  risk_context?: string | null;
+  classification?: string | null;
+  detection_method?: 'rule' | 'file_behaviour' | 'anomaly' | null;
+  verification_status?: string | null;
+  /** JSON-encoded list of evidence strings. */
+  evidence?: string | null;
+}
+
+export interface PhishingEvidence {
+  indicator: string;
+  detail: string;
+  weight: number;
+}
+
+export interface PhishingResult {
+  url: string;
+  host: string;
+  registered_domain: string;
+  score: number;
+  verdict: 'High-risk URL indicators' | 'Suspicious URL' | 'No known phishing indicators';
+  evidence: PhishingEvidence[];
+  recommendations: string[];
+  limitations: string;
+}
+
+export interface DetectionStatus {
+  rules: number;
+  monitoring_active: boolean;
+  anomaly_baseline: {
+    state: 'learning' | 'active' | 'disabled';
+    samples?: number;
+    cycles?: number;
+    required_samples?: number;
+    required_cycles?: number;
+    progress?: number;
+    trained_at?: string;
+    threshold?: number;
+    false_positive_target?: number;
+  };
+  ransomware_monitor: {
+    enabled: boolean;
+    running: boolean;
+    watching: string[];
+    thresholds: Record<string, number>;
+    error: string;
+  };
+}
+
+export interface RiskContext {
+  asset_criticality: 'low' | 'medium' | 'high' | 'critical';
+  exposure: 'local' | 'internal' | 'internet';
+  privileged_user: boolean;
+  off_hours: boolean;
+  adjustments: string[];
+  ml_anomaly_score?: number;
+}
+
+export type ResponseStatus = 'proposed' | 'approved' | 'rejected' | 'executed' | 'dry_run' | 'failed' | 'expired' | 'resumed';
+
+export interface ResponseAction {
+  id: number;
+  threat_id: number;
+  action: 'suspend_process' | 'terminate_process';
+  response_level: number;
+  target_pid: number;
+  target_name: string;
+  risk_level: string;
+  reason: string;
+  status: ResponseStatus;
+  proposed_at: string;
+  expires_at: string;
+  decided_by: string | null;
+  decided_at: string | null;
+  executed_at: string | null;
+  result_message: string | null;
+}
+
+export interface AuditEntry {
+  id: number;
+  created_at: string;
+  actor: string;
+  action: string;
+  target_type: string;
+  target_id: string;
+  outcome: string;
+  details: Record<string, unknown>;
+  source_ip: string;
+  entry_hash: string;
+}
+
+export interface AuditVerification {
+  valid: boolean;
+  checked: number;
+  first_invalid_id: number | null;
 }
 
 export interface Advisory {
@@ -72,6 +167,48 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  warning?: string;
+  sources?: string[];
+  evidence?: AssistantEvidence[];
+  recommendations?: string[];
+  uncertain?: boolean;
+  mode?: 'llm' | 'local';
+}
+
+export interface AssistantEvidence {
+  kind: 'knowledge' | 'securex_record';
+  source: string;
+  excerpt: string;
+}
+
+export interface AssistantResponse {
+  response: string;
+  recommendations: string[];
+  evidence: AssistantEvidence[];
+  sources: string[];
+  confidence?: number;
+  uncertain: boolean;
+  warning: string;
+  mode: 'llm' | 'local';
+  timestamp: string;
+}
+
+export interface AssistantHistoryEntry {
+  id: number;
+  query: string;
+  response: string;
+  confidence: number | null;
+  created_at: string;
+}
+
+export interface NotificationDelivery {
+  id: number;
+  recipient: string;
+  threat_name: string;
+  risk_level: string;
+  status: 'sent' | 'failed';
+  error_message: string | null;
+  sent_at: string;
 }
 
 export interface NotificationStatus {
@@ -83,6 +220,8 @@ export interface NotificationStatus {
     medium: boolean;
     low: boolean;
   };
+  cooldown_seconds: number;
+  smtp_configured: boolean;
 }
 
 export interface MLStatus {
@@ -95,4 +234,22 @@ export interface SystemInfo {
   version: string;
   database_type: string;
   rules_loaded: number;
+}
+
+export interface ReleaseInfo {
+  product: string;
+  version: string;
+  status: 'preview' | 'stable';
+  released_at: string;
+  platform: string;
+  file: string;
+  size_bytes: number;
+  sha256: string;
+  notes: string[];
+  download_url: string;
+}
+
+export interface PublicInfo {
+  app_version: string;
+  release: ReleaseInfo | null;
 }

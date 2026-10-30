@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,6 +63,11 @@ export default function LoginPage() {
               {isLoggingIn ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
+          <p className="mt-4 text-center text-xs text-muted-foreground">
+            New to SecureX? <Link to="/signup" className="text-primary hover:underline">Create an account</Link>
+            {' · '}
+            <Link to="/welcome" className="text-primary hover:underline">Learn what it does</Link>
+          </p>
         </CardContent>
       </Card>
     </div>

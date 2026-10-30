@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { LayoutDashboard, ShieldAlert, LineChart, Bot, Settings, ShieldCheck, ScrollText } from 'lucide-react';
+import { LayoutDashboard, ShieldAlert, LineChart, Bot, Settings, ShieldCheck, ScrollText, Siren, Radar } from 'lucide-react';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
 import { GuardMark } from '@/components/GuardMark';
 import { api } from '@/lib/api';
@@ -10,7 +10,10 @@ const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/threats', label: 'Threats', icon: ShieldAlert },
   { to: '/analytics', label: 'Analytics', icon: LineChart },
+  { to: '/detection', label: 'Detection', icon: Radar },
   { to: '/assistant', label: 'AI Assistant', icon: Bot },
+  { to: '/responses', label: 'Response Center', icon: Siren },
+  { to: '/audit', label: 'Audit Log', icon: ScrollText },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 

@@ -1,0 +1,17 @@
+# records: N. Moustafa and J. Slay, "UNSW-NB15: A comprehensive data set for network intrusion
+#   detection systems," MilCIS 2015, Table VIII (full data set, 2,540,044 records).
+# f1_original: M. Sarhan et al., Mobile Netw. Appl., 2022 (arXiv:2101.11315v2), Table 9,
+#   column "UNSW-NB15" (original features), Extra Trees multi-class classification.
+# The two columns come from different papers; they are shown together to relate class frequency
+# to per-class detection quality, not as the output of a single experiment.
+class,records,f1_original
+Normal,2218761,1.00
+Generic,215481,0.91
+Exploits,44525,0.80
+Fuzzers,24246,0.57
+DoS,16353,0.18
+Reconnaissance,13987,0.80
+Analysis,2677,0.03
+Backdoor,2329,0.08
+Shellcode,1511,0.59
+Worms,174,0.09

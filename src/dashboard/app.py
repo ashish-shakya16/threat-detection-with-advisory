@@ -6,6 +6,8 @@ Professional Flask-based web interface with real-time monitoring
 import os
 import sys
 import json
+import re
+import sqlite3
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -24,13 +26,41 @@ from src.detection.rule_engine import RuleEngine
 from src.risk_assessment.risk_scorer import RiskScorer
 from src.advisory.advisor import SecurityAdvisor
 from src.assistant.ai_assistant import AIAssistant
-from src.auth import login_required, verify_password
+from src.auth import login_required, verify_password, hash_password
 from src.dashboard.routes.api_threats import init_threats_routes
 from src.dashboard.routes.api_stats import init_stats_routes
 from src.dashboard.routes.api_analytics import init_analytics_routes
 from src.dashboard.routes.api_notifications import init_notifications_routes
 from src.dashboard.routes.api_ml import init_ml_routes
+from src.dashboard.routes.api_public import init_public_routes
 from src.ml_models.ml_integration import MLIntegration
+from src.audit import AuditLog
+from src.response import ResponseManager, ResponseError
+from src.risk_assessment.asset_context import AssetContextResolver
+from src.detection.threat_classifier import classify
+from src.detection.ransomware_monitor import RansomwareMonitor
+from src.detection.behaviour_baseline import BehaviourBaseline
+from src.detection.phishing_url import analyze_url
+
+def _load_env_file(path):
+    """Load KEY=VALUE lines from .env without overriding real environment
+    variables, so secrets such as SMTP credentials can live in .env."""
+    if not os.path.isfile(path):
+        return
+    with open(path, encoding='utf-8') as env_file:
+        for line in env_file:
+            line = line.strip()
+            if not line or line.startswith('#') or '=' not in line:
+                continue
+            key, value = line.split('=', 1)
+            key, value = key.strip(), value.strip().strip('"').strip("'")
+            if key and value and key not in os.environ:
+                os.environ[key] = value
+
+
+# Tests must not pick up real credentials.
+if os.environ.get('FLASK_ENV') != 'testing':
+    _load_env_file(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), '.env'))
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -104,13 +134,30 @@ config = Config('config/config.yaml')
 logger = Logger.setup_logging(config)
 rules_data = load_rules(config.get('detection.rule_based.rules_file', 'config/rules.json'))
 db = DatabaseManager(os.environ.get('THREAT_DB_PATH') or config.get('database.path', 'data/db/threats.db'))
+app.config['SECUREX_DB'] = db
+audit_log = AuditLog(db.db_path)
+app.config['SECUREX_AUDIT'] = audit_log
 system_monitor = SystemMonitor(config.config)
 network_monitor = NetworkMonitor(config.config)
 rule_engine = RuleEngine(rules_data)
 RECURRING_THREAT_WINDOW_MINUTES = config.get('monitoring.recurring_threat_window_minutes', 5)
 risk_scorer = RiskScorer(config.config)
+asset_context = AssetContextResolver(config.config)
+response_manager = ResponseManager(db.db_path, audit_log, config.get('response', {}) or {})
+# Additional detectors: ransomware-like file activity and a learned baseline
+# of normal process behaviour for unknown threats (see src/detection/).
+ransomware_monitor = RansomwareMonitor(config.get('ransomware_detection', {}) or {})
+behaviour_baseline = BehaviourBaseline(
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(db.db_path))), 'models'),
+    config.get('anomaly_baseline', {}) or {},
+)
+if os.environ.get('FLASK_ENV') != 'testing':
+    ransomware_monitor.start()
 advisor = SecurityAdvisor(rules_data['advisory_templates'], config.config)
 ai_assistant = AIAssistant(db, config.config)
+# Load the embedding model in the background so startup is not delayed.
+if os.environ.get('FLASK_ENV') != 'testing':
+    ai_assistant.retriever.warm_up()
 
 # Initialize ML integration
 ml_integration = MLIntegration()
@@ -118,10 +165,15 @@ ml_integration = MLIntegration()
 # Initialize notification manager
 notification_manager = None
 notification_config = config.config.get('notifications', {})
-if notification_config.get('enabled', False):
+if notification_config:
     try:
         from src.notifications.notification_manager import NotificationManager
-        notification_manager = NotificationManager(notification_config)
+        notification_manager = NotificationManager(
+            notification_config,
+            db=db,
+            dashboard_url=os.environ.get('SECUREX_DASHBOARD_URL', 'http://localhost:5000'),
+        )
+        notification_manager.start_worker()
     except Exception as e:
         logger.error(f"Failed to initialize notifications: {str(e)}")
 
@@ -139,9 +191,20 @@ app.register_blueprint(stats_bp)
 app.register_blueprint(analytics_bp)
 app.register_blueprint(notifications_bp)
 app.register_blueprint(ml_bp)
+# Public landing-page routes (no login): version and verified release download.
+app.register_blueprint(init_public_routes(db.get_system_info().get('version', '')))
 
 
 # ==================== WEB ROUTES ====================
+
+def audit_event(action, target_type='', target_id='', outcome='success', details=None, actor=None):
+    """Record an action by the current dashboard user in the audit log."""
+    audit_log.record(
+        actor or session.get('username', 'anonymous'),
+        action, target_type, target_id, outcome, details,
+        request.remote_addr if request else '',
+    )
+
 
 @app.route('/api/auth/login', methods=['POST'])
 def api_login():
@@ -154,14 +217,56 @@ def api_login():
     if user and verify_password(user['password_hash'], password):
         session['username'] = username
         db.update_last_login(username)
+        audit_event('auth.login', 'user', username)
         return jsonify({'success': True, 'data': {'username': username}})
 
+    audit_event('auth.login', 'user', str(username)[:100], 'failure', actor=str(username)[:100] or 'anonymous')
     return jsonify({'success': False, 'error': 'Invalid username or password'}), 401
+
+
+USERNAME_PATTERN = re.compile(r'^[A-Za-z0-9_.-]{3,32}$')
+EMAIL_PATTERN = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+MIN_PASSWORD_LENGTH = 8
+
+
+@app.route('/api/auth/signup', methods=['POST'])
+def api_signup():
+    """Create a new user account, save it, and sign the user in"""
+    data = request.get_json() or {}
+    username = str(data.get('username', '')).strip()
+    email = str(data.get('email', '')).strip().lower()
+    password = str(data.get('password', ''))
+
+    if not USERNAME_PATTERN.match(username):
+        error = 'Username must be 3-32 characters: letters, numbers, dot, dash or underscore'
+    elif len(email) > 254 or not EMAIL_PATTERN.match(email):
+        error = 'Enter a valid email address'
+    elif len(password) < MIN_PASSWORD_LENGTH:
+        error = f'Password must be at least {MIN_PASSWORD_LENGTH} characters'
+    elif len(password) > 128:
+        error = 'Password must be at most 128 characters'
+    else:
+        error = None
+    if error:
+        return jsonify({'success': False, 'error': error}), 400
+
+    try:
+        db.create_user(username, email, hash_password(password))
+    except sqlite3.IntegrityError:
+        audit_event('auth.signup', 'user', username[:100], 'failure', actor=username[:100])
+        return jsonify({'success': False, 'error': 'That username or email is already registered'}), 409
+
+    session['username'] = username
+    db.update_last_login(username)
+    audit_event('auth.signup', 'user', username, actor=username)
+    return jsonify({'success': True, 'data': {'username': username}}), 201
 
 
 @app.route('/api/auth/logout', methods=['POST'])
 def api_logout():
     """JSON logout endpoint for the SPA"""
+    if 'username' in session:
+        audit_event('auth.logout', 'user', session['username'])
     session.pop('username', None)
     return jsonify({'success': True})
 
@@ -326,6 +431,7 @@ def start_scan():
     """Start a single scan"""
     try:
         threats_detected = perform_scan()
+        audit_event('scan.run', details={'threats_detected': len(threats_detected)})
         return jsonify({
             'success': True,
             'data': {
@@ -362,6 +468,7 @@ def start_monitoring():
         monitoring_active = True
         monitor_thread = threading.Thread(target=monitoring_loop, daemon=True)
         monitor_thread.start()
+        audit_event('monitoring.start')
         return jsonify({
             'success': True,
             'data': {'message': 'Monitoring started'}
@@ -380,6 +487,7 @@ def stop_monitoring():
     
     if monitoring_active:
         monitoring_active = False
+        audit_event('monitoring.stop')
         return jsonify({
             'success': True,
             'data': {'message': 'Monitoring stopped'}
@@ -395,28 +503,194 @@ def stop_monitoring():
 def assistant_chat():
     """Handle AI assistant chat requests"""
     try:
-        data = request.get_json()
-        user_message = data.get('message', '')
-
-        if not user_message:
-            return jsonify({
-                'success': False,
-                'error': 'Message is required'
-            }), 400
-
-        # Get AI response
-        response = ai_assistant.answer_question(user_message)
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            data = {}
+        user = db.get_user_by_username(session['username'])
+        if not user:
+            return jsonify({'success': False, 'error': 'User not found'}), 403
+        result = ai_assistant.answer_question_details(data.get('message', ''), user_id=user['id'])
         
         return jsonify({
             'success': True,
-            'response': response
+            'data': result,
+            # Top-level copy kept for older clients that read json.response.
+            **result,
         })
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
         logger.error(f"Error in AI assistant: {e}")
         return jsonify({
             'success': False,
             'error': 'Failed to process your request'
         }), 500
+
+
+@app.route('/api/assistant/history', methods=['GET'])
+@login_required
+def assistant_history():
+    """Return conversation history for the authenticated user only."""
+    user = db.get_user_by_username(session['username'])
+    if not user:
+        return jsonify({'success': False, 'error': 'User not found'}), 403
+    try:
+        limit = min(max(int(request.args.get('limit', 50)), 1), 100)
+    except ValueError:
+        return jsonify({'success': False, 'error': 'Invalid limit'}), 400
+    return jsonify({
+        'success': True,
+        'data': ai_assistant.get_conversation_history(user['id'], limit),
+    })
+
+
+@app.route('/api/assistant/history', methods=['DELETE'])
+@login_required
+def clear_assistant_history():
+    """Delete the authenticated user's conversation history (other users' is untouched)."""
+    user = db.get_user_by_username(session['username'])
+    if not user:
+        return jsonify({'success': False, 'error': 'User not found'}), 403
+    deleted = db.delete_conversations_for_user(user['id'])
+    audit_event('assistant.history_cleared', 'user', session['username'], details={'deleted': deleted})
+    return jsonify({'success': True, 'data': {'deleted': deleted}})
+
+
+@app.route('/api/assistant/explain/<int:threat_id>', methods=['GET'])
+@login_required
+def assistant_explain_threat(threat_id):
+    """Explain a stored threat without granting the assistant action access."""
+    threat = db.get_threat_by_id(threat_id)
+    if not threat:
+        return jsonify({'success': False, 'error': 'Threat not found'}), 404
+    try:
+        result = ai_assistant.explain_threat_details(threat, db.get_advisory_for_threat(threat_id))
+        audit_event('assistant.explain', 'threat', threat_id, details={'mode': result['mode']})
+    except Exception as e:
+        logger.error(f"Error explaining threat {threat_id}: {e}")
+        return jsonify({'success': False, 'error': 'Failed to explain threat'}), 500
+    return jsonify({'success': True, 'data': result})
+
+
+# ==================== AUDIT & RESPONSE ====================
+
+def _int_arg(name, default, low, high):
+    try:
+        return min(max(int(request.args.get(name, default)), low), high)
+    except ValueError:
+        raise ValueError(f'Invalid {name}')
+
+
+@app.route('/api/audit', methods=['GET'])
+@login_required
+def list_audit_log():
+    """Audit trail, newest first. Filters: action (prefix), actor."""
+    try:
+        limit = _int_arg('limit', 50, 1, 200)
+        offset = _int_arg('offset', 0, 0, 10_000_000)
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    return jsonify({'success': True, 'data': audit_log.list(
+        limit, offset, request.args.get('action', '')[:100], request.args.get('actor', '')[:100]
+    )})
+
+
+@app.route('/api/audit/verify', methods=['GET'])
+@login_required
+def verify_audit_log():
+    """Recompute the hash chain to detect edited or deleted entries."""
+    result = audit_log.verify_chain()
+    audit_event('audit.verify', outcome='success' if result['valid'] else 'failure',
+                details={'checked': result['checked']})
+    return jsonify({'success': True, 'data': result})
+
+
+@app.route('/api/responses', methods=['GET'])
+@login_required
+def list_responses():
+    """Response proposals and their outcomes. Filters: threat_id, status."""
+    try:
+        threat_id = request.args.get('threat_id')
+        threat_id = int(threat_id) if threat_id else None
+        limit = _int_arg('limit', 50, 1, 200)
+    except ValueError:
+        return jsonify({'success': False, 'error': 'Invalid query parameter'}), 400
+    return jsonify({
+        'success': True,
+        'data': response_manager.list(threat_id, request.args.get('status', '')[:20], limit),
+        'execution_enabled': response_manager.execution_enabled,
+    })
+
+
+def _decide(proposal_id, decision):
+    actor = session['username']
+    try:
+        result = getattr(response_manager, decision)(proposal_id, actor, request.remote_addr or '')
+    except ResponseError as e:
+        return jsonify({'success': False, 'error': str(e)}), 409
+    except Exception as e:
+        logger.error(f"Response {decision} failed for proposal {proposal_id}: {e}")
+        return jsonify({'success': False, 'error': 'Response action failed'}), 500
+    return jsonify({'success': True, 'data': result})
+
+
+@app.route('/api/responses/<int:proposal_id>/approve', methods=['POST'])
+@login_required
+def approve_response(proposal_id):
+    """Human approval: re-verifies the target, then executes (or dry-runs)."""
+    return _decide(proposal_id, 'approve')
+
+
+@app.route('/api/responses/<int:proposal_id>/reject', methods=['POST'])
+@login_required
+def reject_response(proposal_id):
+    return _decide(proposal_id, 'reject')
+
+
+@app.route('/api/responses/<int:proposal_id>/resume', methods=['POST'])
+@login_required
+def resume_response(proposal_id):
+    """Roll back an executed suspension."""
+    return _decide(proposal_id, 'resume')
+
+
+# ==================== DETECTION TOOLS ====================
+
+@app.route('/api/phishing/analyze', methods=['POST'])
+@login_required
+def analyze_phishing_url():
+    """Local phishing analysis of a URL. The URL is never opened or fetched."""
+    data = request.get_json(silent=True)
+    url = data.get('url') if isinstance(data, dict) else None
+    try:
+        result = analyze_url(url)
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    # Log the host and verdict only; full URLs can contain private tokens.
+    audit_event('phishing.analyze', 'host', result['host'], details={'verdict': result['verdict'],
+                                                                     'score': result['score']})
+    return jsonify({'success': True, 'data': result})
+
+
+@app.route('/api/detection/status', methods=['GET'])
+@login_required
+def detection_status():
+    """What each detector is doing right now."""
+    return jsonify({'success': True, 'data': {
+        'rules': len(rule_engine.rules),
+        'anomaly_baseline': behaviour_baseline.status(),
+        'ransomware_monitor': ransomware_monitor.status(),
+        'monitoring_active': monitoring_active,
+    }})
+
+
+@app.route('/api/detection/baseline/reset', methods=['POST'])
+@login_required
+def reset_behaviour_baseline():
+    """Discard the learned baseline and start learning again."""
+    behaviour_baseline.reset()
+    audit_event('detection.baseline_reset')
+    return jsonify({'success': True, 'data': behaviour_baseline.status()})
 
 
 # ==================== BACKEND LOGIC ====================
@@ -443,22 +717,39 @@ def perform_scan():
     
     logger.info(f"Dashboard scan: {len(all_events)} events collected")
     
-    # Step 2: Detect threats using rule engine
-    for event in all_events:
-        threat = rule_engine.check_event(event)
-        
+    # Step 2: Candidate detections from every detector, each classified
+    # with its evidence and verification status.
+    candidates = [threat for threat in (rule_engine.check_event(event) for event in all_events) if threat]
+    candidates.extend(ransomware_monitor.drain_alerts())
+    try:
+        candidates.extend(behaviour_baseline.observe())
+    except Exception as e:
+        logger.error(f"Behaviour baseline failed: {e}")
+
+    for threat in candidates:
+        classify(threat)
         if threat:
             # Step 3: Calculate risk score
             threat_with_risk = risk_scorer.calculate_risk(threat)
 
-            # Step 3b: Adjust for off-hours activity (10pm-6am local time is
-            # more suspicious than daytime activity for the same event)
+            # Step 3b: Adjust for context: off-hours activity (10pm-6am local
+            # time), asset criticality, network exposure and privileged
+            # accounts. See src/risk_assessment/asset_context.py.
             current_hour = datetime.now().hour
-            is_off_hours = current_hour >= 22 or current_hour < 6
-            if is_off_hours:
-                threat_with_risk = risk_scorer.adjust_risk_by_context(
-                    threat_with_risk, {'off_hours': True}
-                )
+            context = asset_context.resolve(threat_with_risk)
+            context['off_hours'] = current_hour >= 22 or current_hour < 6
+            threat_with_risk = risk_scorer.adjust_risk_by_context(threat_with_risk, context)
+            threat_with_risk['risk_context'] = dict(
+                context, adjustments=threat_with_risk.get('risk_adjustments', [])
+            )
+
+            # Step 3c: Isolation Forest anomaly score, once a model has been
+            # trained (POST /api/ml/train). Blended, never lowers the rule score.
+            if ml_integration.model_trained:
+                ml_risk = ml_integration.calculate_ml_risk_score(threat_with_risk)
+                threat_with_risk = ml_integration.enrich_threat_with_ml_score(threat_with_risk, ml_risk)
+                threat_with_risk['risk_level'] = risk_scorer._classify_risk_level(threat_with_risk['risk_score'])
+                threat_with_risk['risk_context']['ml_anomaly_score'] = round(ml_risk, 3)
 
             # Step 4: Merge into an existing ongoing threat if the same
             # threat/source is still active, instead of logging a fresh row
@@ -477,6 +768,7 @@ def perform_scan():
                     threat_with_risk.get('risk_level', recurring['risk_level'])
                 )
                 threat_id = recurring['id']
+                advisory = None
             else:
                 # Step 5: Generate advisory and log as a new threat
                 advisory = advisor.generate_advisory(threat_with_risk)
@@ -492,8 +784,33 @@ def perform_scan():
                     'risk_score': threat_with_risk.get('risk_score', 0),
                     'timestamp': threat_with_risk['timestamp']
                 })
-    
+
+            # Step 6: Graduated response. High/Critical threats with a live
+            # process get containment *proposals* that a user must approve.
+            try:
+                response_manager.propose_for_threat(threat_id, threat_with_risk)
+            except Exception as e:
+                logger.error(f"Failed to create response proposals: {e}")
+
+            # Step 7: Queue an email alert. Severity rules and the cooldown
+            # inside NotificationManager decide whether anything is sent, so
+            # an ongoing recurring threat does not produce repeated emails.
+            _queue_threat_notification(threat_with_risk, advisory)
+
     return all_threats
+
+
+def _queue_threat_notification(threat, advisory=None):
+    """Hand a detected threat to the background email worker."""
+    if not notification_manager:
+        return
+    try:
+        alert = dict(threat)
+        if advisory:
+            alert['advice'] = advisory.get('advice', [])
+        notification_manager.enqueue_threat(alert)
+    except Exception as e:
+        logger.error(f"Failed to queue threat notification: {e}")
 
 def monitoring_loop():
     """Continuous monitoring loop that runs in background"""
@@ -543,7 +860,14 @@ def monitoring_loop():
 
 @socketio.on('connect')
 def handle_connect():
-    """Handle client connection"""
+    """Accept real-time connections only from logged-in dashboard sessions.
+
+    Threat broadcasts and system metrics are sensitive, so an unauthenticated
+    client is refused (it receives connect_error).
+    """
+    if 'username' not in session:
+        logger.info('Rejected unauthenticated Socket.IO connection')
+        return False
     logger.info(f"Client connected: {request.sid}")
     emit('connected', {'message': 'Connected to Threat Advisor'})
 
@@ -594,9 +918,15 @@ def serve_spa(path):
 # ==================== MAIN ====================
 
 if __name__ == '__main__':
-    dashboard_host = config.get('dashboard.host', '127.0.0.1')
-    dashboard_port = config.get('dashboard.port', 5000)
-    debug_mode = config.get('system.debug', False) and config.get('system.environment') == 'development'
+    dashboard_host = os.environ.get('HOST', config.get('dashboard.host', '127.0.0.1'))
+    dashboard_port = int(os.environ.get('PORT', config.get('dashboard.port', 5000)))
+    debug_mode = (
+        os.environ.get('FLASK_DEBUG', '').lower() == 'true'
+        or (
+            config.get('system.debug', False)
+            and config.get('system.environment') == 'development'
+        )
+    )
 
     print("=" * 70)
     print("  Cybersecurity Threat Advisor - Web Dashboard")
@@ -608,4 +938,10 @@ if __name__ == '__main__':
     print("=" * 70)
     print()
 
-    socketio.run(app, host=dashboard_host, port=dashboard_port, debug=debug_mode)
+    socketio.run(
+        app,
+        host=dashboard_host,
+        port=dashboard_port,
+        debug=debug_mode,
+        use_reloader=False,
+    )

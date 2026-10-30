@@ -21,6 +21,8 @@ datas = [
     (os.path.join(ROOT, "frontend", "dist"), os.path.join("frontend", "dist")),
     (os.path.join(ROOT, "frontend", "public", "favicon.svg"), os.path.join("frontend", "public")),
     (os.path.join(ROOT, "assets_build", "securex.ico"), "assets_build"),
+    # Knowledge base for the AI assistant's retrieval.
+    (os.path.join(ROOT, "docs", "security_knowledge"), os.path.join("docs", "security_knowledge")),
 ]
 
 a = Analysis(
@@ -35,6 +37,12 @@ a = Analysis(
         "src.dashboard.routes.api_analytics",
         "src.dashboard.routes.api_notifications",
         "src.dashboard.routes.api_ml",
+        "src.dashboard.routes.api_public",
+        # Imported lazily inside functions, so PyInstaller cannot see them.
+        "watchdog.observers",
+        "watchdog.events",
+        "sklearn.ensemble",
+        "joblib",
     ],
     hookspath=[],
     hooksconfig={},

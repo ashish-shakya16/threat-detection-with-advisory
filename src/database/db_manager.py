@@ -18,6 +18,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 import json
+import uuid
 
 
 class DatabaseManager:
@@ -50,12 +51,21 @@ class DatabaseManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
+        index_statements = []
+
         # Load and execute schema.sql
         schema_path = os.path.join(os.path.dirname(__file__), 'schema.sql')
         if os.path.exists(schema_path):
             with open(schema_path, 'r') as f:
                 schema_sql = f.read()
-                cursor.executescript(schema_sql)
+                schema_lines = []
+                for line in schema_sql.splitlines():
+                    stripped = line.strip()
+                    if stripped.startswith('CREATE INDEX '):
+                        index_statements.append(line)
+                    else:
+                        schema_lines.append(line)
+                cursor.executescript('\n'.join(schema_lines))
         else:
             # Fallback to inline schema if schema.sql doesn't exist
             cursor.execute('''
@@ -112,11 +122,49 @@ class DatabaseManager:
 
         # Migrate existing databases created before occurrence tracking existed
         existing_columns = {row[1] for row in cursor.execute('PRAGMA table_info(threats)').fetchall()}
+
+        if 'device_id' not in existing_columns:
+            cursor.execute('ALTER TABLE threats ADD COLUMN device_id INTEGER')
+            existing_columns.add('device_id')
+
+        if 'detected_at' not in existing_columns:
+            cursor.execute('ALTER TABLE threats ADD COLUMN detected_at TIMESTAMP')
+            existing_columns.add('detected_at')
+
         if 'occurrence_count' not in existing_columns:
             cursor.execute('ALTER TABLE threats ADD COLUMN occurrence_count INTEGER DEFAULT 1')
+            existing_columns.add('occurrence_count')
+
         if 'last_seen_at' not in existing_columns:
             cursor.execute('ALTER TABLE threats ADD COLUMN last_seen_at TIMESTAMP')
-            cursor.execute('UPDATE threats SET last_seen_at = detected_at WHERE last_seen_at IS NULL')
+
+        for column in ('risk_context', 'classification', 'detection_method', 'verification_status', 'evidence'):
+            if column not in existing_columns:
+                cursor.execute(f'ALTER TABLE threats ADD COLUMN {column} TEXT')
+
+        detected_source = 'CURRENT_TIMESTAMP'
+        if 'timestamp' in existing_columns:
+            detected_source = 'timestamp'
+        elif 'created_at' in existing_columns:
+            detected_source = 'created_at'
+
+        if 'detected_at' in existing_columns:
+            cursor.execute(f"UPDATE threats SET detected_at = COALESCE(detected_at, {detected_source}, CURRENT_TIMESTAMP)")
+
+        if 'last_seen_at' in existing_columns:
+            if 'detected_at' in existing_columns:
+                cursor.execute('UPDATE threats SET last_seen_at = COALESCE(last_seen_at, detected_at, CURRENT_TIMESTAMP)')
+            elif 'timestamp' in existing_columns:
+                cursor.execute('UPDATE threats SET last_seen_at = COALESCE(last_seen_at, timestamp, CURRENT_TIMESTAMP)')
+            elif 'created_at' in existing_columns:
+                cursor.execute('UPDATE threats SET last_seen_at = COALESCE(last_seen_at, created_at, CURRENT_TIMESTAMP)')
+            else:
+                cursor.execute('UPDATE threats SET last_seen_at = COALESCE(last_seen_at, CURRENT_TIMESTAMP)')
+
+        # Create indexes after any backwards-compatibility column migrations so
+        # older databases do not fail while the table is being upgraded.
+        for index_sql in index_statements:
+            cursor.execute(index_sql)
 
         conn.commit()
         conn.close()
@@ -139,22 +187,44 @@ class DatabaseManager:
         try:
             cursor = conn.cursor()
 
-            cursor.execute('''
-                INSERT INTO threats (
-                    threat_name, category, severity,
-                    risk_level, risk_score, confidence, source, description,
-                    last_seen_at, occurrence_count
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 1)
-            ''', (
-                threat_data.get('threat_name'),
-                threat_data.get('category'),
-                threat_data.get('severity'),
-                threat_data.get('risk_level'),
-                threat_data.get('risk_score'),
-                threat_data.get('confidence'),
-                threat_data.get('source', 'Unknown'),
-                threat_data.get('description', '')
-            ))
+            now_iso = datetime.now().isoformat()
+            existing_columns = {row[1] for row in cursor.execute('PRAGMA table_info(threats)').fetchall()}
+
+            # Support both legacy and current threat schemas.
+            values_by_column = {
+                'threat_id': threat_data.get('threat_id') or threat_data.get('rule_id') or f"threat-{uuid.uuid4().hex[:12]}",
+                'timestamp': threat_data.get('timestamp') or now_iso,
+                'detected_at': threat_data.get('detected_at') or now_iso,
+                'created_at': now_iso,
+                'last_seen_at': now_iso,
+                'occurrence_count': 1,
+                'threat_name': threat_data.get('threat_name') or 'Unknown Threat',
+                'category': threat_data.get('category') or 'general',
+                'severity': threat_data.get('severity') or 'low',
+                'risk_level': threat_data.get('risk_level') or 'Low',
+                'risk_score': threat_data.get('risk_score') if threat_data.get('risk_score') is not None else 0.0,
+                'confidence': threat_data.get('confidence') if threat_data.get('confidence') is not None else 0.0,
+                'source': threat_data.get('source', 'Unknown'),
+                'description': threat_data.get('description', ''),
+                'details': json.dumps(threat_data.get('details', {})),
+                'status': threat_data.get('status', 'active'),
+                'device_id': threat_data.get('device_id'),
+                'risk_context': json.dumps(threat_data['risk_context']) if threat_data.get('risk_context') else None,
+                'classification': threat_data.get('classification'),
+                'detection_method': threat_data.get('detection_method'),
+                'verification_status': threat_data.get('verification_status'),
+                'evidence': json.dumps(threat_data['evidence']) if threat_data.get('evidence') else None,
+            }
+
+            insert_columns = [col for col in values_by_column.keys() if col in existing_columns]
+            placeholders = ', '.join('?' for _ in insert_columns)
+            column_sql = ', '.join(insert_columns)
+            insert_values = [values_by_column[col] for col in insert_columns]
+
+            cursor.execute(
+                f"INSERT INTO threats ({column_sql}) VALUES ({placeholders})",
+                insert_values,
+            )
 
             threat_id = cursor.lastrowid
             conn.commit()
@@ -275,18 +345,26 @@ class DatabaseManager:
         try:
             cursor = conn.cursor()
 
-            cursor.execute('''
-                INSERT INTO advisories (
-                    threat_id, title, description, reason, recommended_actions, reference_links
-                ) VALUES (?, ?, ?, ?, ?, ?)
-            ''', (
-                threat_id,
-                advisory_data.get('title'),
-                advisory_data.get('description'),
-                advisory_data.get('description'),
-                json.dumps(advisory_data.get('advice', [])),
-                json.dumps(advisory_data.get('references', []))
-            ))
+            advisory_columns = {row[1] for row in cursor.execute('PRAGMA table_info(advisories)').fetchall()}
+            values_by_column = {
+                'threat_id': threat_id,
+                'title': advisory_data.get('title', 'Security Advisory'),
+                'description': advisory_data.get('description', ''),
+                'reason': advisory_data.get('reason') or advisory_data.get('description', ''),
+                'recommended_actions': json.dumps(advisory_data.get('advice', [])),
+                'preventive_tips': json.dumps(advisory_data.get('preventive_tips', [])),
+                'reference_links': json.dumps(advisory_data.get('references', [])),
+            }
+
+            insert_columns = [col for col in values_by_column.keys() if col in advisory_columns]
+            placeholders = ', '.join('?' for _ in insert_columns)
+            column_sql = ', '.join(insert_columns)
+            insert_values = [values_by_column[col] for col in insert_columns]
+
+            cursor.execute(
+                f"INSERT INTO advisories ({column_sql}) VALUES ({placeholders})",
+                insert_values,
+            )
 
             advisory_id = cursor.lastrowid
             conn.commit()
@@ -609,6 +687,182 @@ class DatabaseManager:
                 LIMIT ?
             ''', (user_id, limit))
             return [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
+
+    def delete_conversations_for_user(self, user_id: int) -> int:
+        """Delete all AI assistant conversation history for one user.
+
+        Returns:
+            Number of conversation turns deleted
+        """
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM ai_conversations WHERE user_id = ?', (user_id,))
+            conn.commit()
+            return cursor.rowcount
+        finally:
+            conn.close()
+
+    def has_recent_notification(self, fingerprint: str, recipient: str, within_seconds: int) -> bool:
+        """Return whether this recipient recently received the same alert."""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT 1 FROM notification_deliveries
+                WHERE fingerprint = ? AND recipient = ? AND status = 'sent'
+                  AND sent_at >= datetime('now', ?)
+                LIMIT 1
+            ''', (fingerprint, recipient, f'-{max(0, int(within_seconds))} seconds'))
+            return cursor.fetchone() is not None
+        finally:
+            conn.close()
+
+    def record_notification_delivery(
+        self,
+        fingerprint: str,
+        recipient: str,
+        threat_name: str,
+        risk_level: str,
+        status: str,
+        error_message: str = '',
+    ) -> int:
+        """Record an email delivery attempt without storing message secrets."""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO notification_deliveries
+                    (fingerprint, recipient, threat_name, risk_level, status, error_message)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (fingerprint, recipient, threat_name, risk_level, status, error_message[:1000]))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            conn.close()
+
+    def create_email_verification(self, user_id: int, email: str, token_hash: str, expires_at: str) -> int:
+        """Create a one-time email verification record.
+
+        Earlier unexpired links for the same address stay valid, so opening an
+        older email in the thread still works; any one of them can be used once.
+        """
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                'DELETE FROM notification_email_verifications WHERE user_id = ? AND email = ? '
+                'AND verified_at IS NULL AND expires_at <= CURRENT_TIMESTAMP',
+                (user_id, email),
+            )
+            cursor.execute('''
+                INSERT INTO notification_email_verifications
+                    (user_id, email, token_hash, expires_at)
+                VALUES (?, ?, ?, ?)
+            ''', (user_id, email, token_hash, expires_at))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            conn.close()
+
+    def consume_email_verification(self, token_hash: str) -> Optional[Dict[str, Any]]:
+        """Consume a valid, unexpired verification token once."""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT * FROM notification_email_verifications
+                WHERE token_hash = ? AND verified_at IS NULL
+                  AND expires_at > CURRENT_TIMESTAMP
+            ''', (token_hash,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            cursor.execute(
+                'UPDATE notification_email_verifications SET verified_at = CURRENT_TIMESTAMP WHERE id = ?',
+                (row['id'],),
+            )
+            # The address is verified; the other pending links are no longer needed.
+            cursor.execute(
+                'DELETE FROM notification_email_verifications WHERE email = ? AND verified_at IS NULL',
+                (row['email'],),
+            )
+            conn.commit()
+            return dict(row)
+        finally:
+            conn.close()
+
+    def get_verified_notification_recipients(self) -> List[str]:
+        """Return verified addresses for notification initialization."""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT DISTINCT email FROM notification_email_verifications
+                WHERE verified_at IS NOT NULL
+            ''')
+            return [row[0] for row in cursor.fetchall()]
+        finally:
+            conn.close()
+
+    def revoke_notification_recipient(self, email: str) -> None:
+        """Forget a verified recipient so it is not reloaded on restart."""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            conn.execute('DELETE FROM notification_email_verifications WHERE email = ?', (email,))
+            conn.commit()
+        finally:
+            conn.close()
+
+    def get_recent_notification_deliveries(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """Return recent email delivery attempts, newest first."""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, recipient, threat_name, risk_level, status, error_message, sent_at
+                FROM notification_deliveries
+                ORDER BY id DESC
+                LIMIT ?
+            ''', (limit,))
+            return [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
+
+    def get_setting(self, key: str, default: Any = None) -> Any:
+        """Read a system-wide (user_id IS NULL) JSON setting."""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                'SELECT setting_value FROM settings WHERE user_id IS NULL AND setting_key = ? '
+                'ORDER BY id DESC LIMIT 1',
+                (key,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return default
+            try:
+                return json.loads(row[0])
+            except (TypeError, ValueError):
+                return default
+        finally:
+            conn.close()
+
+    def set_setting(self, key: str, value: Any) -> None:
+        """Store a system-wide JSON setting, replacing any previous value."""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            conn.execute('DELETE FROM settings WHERE user_id IS NULL AND setting_key = ?', (key,))
+            conn.execute(
+                'INSERT INTO settings (user_id, setting_key, setting_value) VALUES (NULL, ?, ?)',
+                (key, json.dumps(value)),
+            )
+            conn.commit()
         finally:
             conn.close()
 

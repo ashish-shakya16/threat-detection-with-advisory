@@ -11,6 +11,7 @@ This is the orchestrator that brings all modules together:
 This is where the magic happens - all components work together!
 """
 
+import os
 import sys
 import time
 import logging
@@ -102,7 +103,11 @@ class ThreatAdvisor:
         if notification_config.get('enabled', False):
             try:
                 from src.notifications.notification_manager import NotificationManager
-                self.notification_manager = NotificationManager(notification_config)
+                self.notification_manager = NotificationManager(
+                    notification_config,
+                    db=self.db,
+                    dashboard_url=os.environ.get('SECUREX_DASHBOARD_URL', 'http://localhost:5000'),
+                )
                 self.logger.info("Notification system initialized")
             except Exception as e:
                 self.logger.error(f"Failed to initialize notifications: {str(e)}")

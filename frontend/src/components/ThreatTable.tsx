@@ -64,7 +64,7 @@ export function ThreatTable({ threats, onRowClick }: ThreatTableProps) {
                 )}
               </div>
             </TableCell>
-            <TableCell className="py-3 text-muted-foreground">{threat.category}</TableCell>
+            <TableCell className="py-3 text-muted-foreground">{threat.classification || threat.category}</TableCell>
             <TableCell className="py-3">
               <div className="flex items-center gap-2">
                 <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">

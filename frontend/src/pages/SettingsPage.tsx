@@ -1,17 +1,31 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Mail, Plus, Trash2, Send, Database, Info } from 'lucide-react';
+import { Mail, Plus, Trash2, Send, Database, Info, AlertTriangle } from 'lucide-react';
 import { TopBar } from '@/components/layout/TopBar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 
 export default function SettingsPage() {
   const [newEmail, setNewEmail] = useState('');
+  const [cooldownDraft, setCooldownDraft] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
+
+  // The verification link in the email redirects here with the outcome.
+  useEffect(() => {
+    const verified = searchParams.get('email_verified');
+    if (verified === null) return;
+    if (verified === '1') toast.success('Email address verified. It will now receive SecureX alerts.');
+    else toast.error('Verification link is invalid or has expired.');
+    searchParams.delete('email_verified');
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const { data: systemInfo, isLoading: infoLoading } = useQuery({
     queryKey: ['system-info'],
@@ -23,12 +37,20 @@ export default function SettingsPage() {
     queryFn: api.notifications.status,
   });
 
+  const { data: deliveries } = useQuery({
+    queryKey: ['notifications', 'deliveries'],
+    queryFn: api.notifications.deliveries,
+    refetchInterval: 30000,
+  });
+
   const addRecipientMutation = useMutation({
-    mutationFn: (email: string) => api.notifications.addRecipient(email),
+    mutationFn: (email: string) => api.notifications.requestRecipientVerification(email),
     onSuccess: () => {
       setNewEmail('');
       queryClient.invalidateQueries({ queryKey: ['notifications', 'status'] });
-      toast.success('Recipient added');
+      toast.success('Verification email sent', {
+        description: 'The address is added once the link in that email is opened.',
+      });
     },
     onError: (error: Error) => toast.error('Failed to add recipient', { description: error.message }),
   });
@@ -39,13 +61,40 @@ export default function SettingsPage() {
       queryClient.invalidateQueries({ queryKey: ['notifications', 'status'] });
       toast.success('Recipient removed');
     },
+    onError: (error: Error) => toast.error('Failed to remove recipient', { description: error.message }),
   });
 
   const testNotificationMutation = useMutation({
     mutationFn: api.notifications.sendTest,
-    onSuccess: () => toast.success('Test notification sent'),
-    onError: (error: Error) => toast.error('Failed to send test', { description: error.message }),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'deliveries'] });
+      if (result?.error) toast.warning('Test sent to some recipients', { description: result.error });
+      else toast.success('Test notification sent');
+    },
+    onError: (error: Error) => {
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'deliveries'] });
+      toast.error('Failed to send test', { description: error.message });
+    },
   });
+
+  const updatePreferencesMutation = useMutation({
+    mutationFn: (preferences: Parameters<typeof api.notifications.updatePreferences>[0]) =>
+      api.notifications.updatePreferences(preferences),
+    onSuccess: () => {
+      setCooldownDraft(null);
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'status'] });
+      toast.success('Notification preferences updated');
+    },
+    onError: (error: Error) => toast.error('Failed to update preferences', { description: error.message }),
+  });
+
+  const preferenceToggles = [
+    ['enabled', 'Email alerts enabled', notificationStatus?.status === 'enabled'],
+    ['critical', 'Critical alerts', notificationStatus?.notification_rules.critical],
+    ['high', 'High alerts', notificationStatus?.notification_rules.high],
+    ['medium', 'Medium alerts', notificationStatus?.notification_rules.medium],
+    ['low', 'Low alerts', notificationStatus?.notification_rules.low],
+  ] as const;
 
   return (
     <div>
@@ -91,6 +140,52 @@ export default function SettingsPage() {
               <Skeleton className="h-32" />
             ) : (
               <>
+                {notificationStatus && !notificationStatus.smtp_configured && (
+                  <div className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+                    <span>
+                      SMTP credentials are not set. Set <code>SECUREX_SMTP_SENDER</code> and{' '}
+                      <code>SECUREX_SMTP_PASSWORD</code> on the server and restart SecureX.
+                    </span>
+                  </div>
+                )}
+
+                <div className="grid gap-3 text-sm sm:grid-cols-2">
+                  {preferenceToggles.map(([key, label, checked]) => (
+                    <label key={key} className="flex items-center gap-2">
+                      <Switch
+                        checked={Boolean(checked)}
+                        disabled={updatePreferencesMutation.isPending}
+                        onCheckedChange={(value) => updatePreferencesMutation.mutate({ [key]: value })}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Suppress duplicate alerts for</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={86400}
+                    className="h-8 w-24"
+                    value={cooldownDraft ?? String(notificationStatus?.cooldown_seconds ?? 0)}
+                    onChange={(e) => setCooldownDraft(e.target.value)}
+                  />
+                  <span className="text-muted-foreground">seconds</span>
+                  {cooldownDraft !== null && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={updatePreferencesMutation.isPending || cooldownDraft === ''}
+                      onClick={() => updatePreferencesMutation.mutate({ cooldown_seconds: Number(cooldownDraft) })}
+                    >
+                      Save
+                    </Button>
+                  )}
+                </div>
+
                 <div className="space-y-2">
                   {(notificationStatus?.recipients ?? []).length === 0 && (
                     <p className="text-sm text-muted-foreground">No recipients configured</p>
@@ -111,7 +206,8 @@ export default function SettingsPage() {
 
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Enter email address..."
+                    type="email"
+                    placeholder="Add an address (a verification link will be sent)"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
                   />
@@ -123,9 +219,38 @@ export default function SettingsPage() {
                   </Button>
                 </div>
 
-                <Button variant="outline" className="w-full" onClick={() => testNotificationMutation.mutate()}>
-                  <Send className="mr-2 h-4 w-4" /> Send Test Notification
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => testNotificationMutation.mutate()}
+                  disabled={testNotificationMutation.isPending}
+                >
+                  <Send className="mr-2 h-4 w-4" />
+                  {testNotificationMutation.isPending ? 'Sending...' : 'Send Test Notification'}
                 </Button>
+
+                <div>
+                  <div className="mb-2 text-sm font-medium">Recent deliveries</div>
+                  {(deliveries ?? []).length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No emails sent yet</p>
+                  ) : (
+                    <ul className="max-h-48 space-y-1 overflow-y-auto text-xs">
+                      {(deliveries ?? []).map((delivery) => (
+                        <li key={delivery.id} className="flex justify-between gap-2 rounded border px-2 py-1">
+                          <span className="truncate">
+                            {delivery.threat_name} ({delivery.risk_level}) to {delivery.recipient}
+                          </span>
+                          <span
+                            className={`shrink-0 ${delivery.status === 'sent' ? 'text-green-600' : 'text-destructive'}`}
+                            title={delivery.error_message || undefined}
+                          >
+                            {delivery.status} · {new Date(`${delivery.sent_at.replace(' ', 'T')}Z`).toLocaleString()}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </>
             )}
           </CardContent>

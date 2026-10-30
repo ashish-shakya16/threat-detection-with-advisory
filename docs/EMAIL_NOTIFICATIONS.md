@@ -7,8 +7,10 @@ SecureX can send email alerts when security threats are detected on your system.
 - **Real-time alerts** for Critical and High-risk threats
 - **HTML-formatted emails** with detailed threat information
 - **Daily summaries** of detected threats
-- **Configurable recipients** for team-based security monitoring
-- **Retry logic** to ensure reliable delivery
+- **Verified recipients** added from the Settings page by email confirmation
+- **Duplicate suppression** with a configurable cooldown
+- **Retry logic** with connection timeouts, and a delivery-status log
+- **Test email** button in Settings
 - **Support for Gmail, Outlook, and custom SMTP** servers
 
 ## Configuration
@@ -43,7 +45,9 @@ notifications:
     smtp_server: "smtp.gmail.com"
     smtp_port: 587
     sender_email: "your-email@gmail.com"
-    sender_password: "your-16-char-app-password"
+    sender_password: ""
+    sender_password_env: "SECUREX_SMTP_PASSWORD"
+    sender_email_env: "SECUREX_SMTP_SENDER"
     use_tls: true
 ```
 
@@ -144,18 +148,27 @@ Optional daily summary of all threats detected:
 
 ## Example: Environment Variable Setup
 
-Store sensitive credentials in `.env`:
+Store sensitive credentials in environment variables:
 
 ```bash
 SECUREX_SMTP_PASSWORD=your-app-password
+SECUREX_SMTP_SENDER=your-email@gmail.com
 ```
 
-Then in Python:
+`NotificationManager` reads the variables named by `smtp.sender_password_env` and
+`smtp.sender_email_env` automatically. Nothing needs to be copied into `config.yaml`.
 
-```python
-import os
-config['notifications']['smtp']['sender_password'] = os.getenv('SECUREX_SMTP_PASSWORD')
-```
+## Verified Recipients, Suppression and Delivery Log
+
+- Addresses added in Settings get a one-time verification link (valid 30 minutes). They
+  receive alerts only after the link is opened. Removing an address also deletes its
+  verification, so it does not come back after a restart.
+- The same alert is sent to a recipient at most once per `cooldown_seconds`. Failed
+  sends do not start the cooldown.
+- Every attempt is stored in `notification_deliveries` (recipient, threat, severity,
+  `sent`/`failed`, error, timestamp) and is listed in Settings.
+- The dashboard sends from a background worker thread, so SMTP timeouts and retries never
+  delay threat detection.
 
 ## API Reference
 
@@ -164,10 +177,22 @@ config['notifications']['smtp']['sender_password'] = os.getenv('SECUREX_SMTP_PAS
 ```python
 from src.notifications.notification_manager import NotificationManager
 
-manager = NotificationManager(config)
+# db enables durable suppression, delivery records, verified recipients
+# and saved preferences; without it, suppression is in memory only.
+manager = NotificationManager(config, db=db_manager, dashboard_url='http://localhost:5000')
 
-# Send immediate threat alert
+# Send immediate threat alert (applies severity rules and cooldown)
 manager.notify_threat(threat_dict)
+
+# Or queue it for the background worker
+manager.start_worker()
+manager.enqueue_threat(threat_dict)
+
+# Test email: ignores severity rules and cooldown, reports per-recipient errors
+result = manager.send_test_email()   # {'success', 'results', 'error'}
+
+# Change and persist preferences
+manager.update_preferences({'high': True, 'cooldown_seconds': 600})
 
 # Send daily summary
 manager.notify_daily_summary(threats_list)

@@ -4,7 +4,8 @@ Risk Assessment Module
 This module calculates risk scores and classifies threats:
 - Combines multiple factors (severity, confidence, impact)
 - Calculates numerical risk score (0-1)
-- Classifies into Low, Medium, High risk levels
+- Classifies into Low, Medium, High, Critical risk levels
+- Adjusts for asset criticality, network exposure and context
 - Provides reasoning for the risk score
 
 Risk scoring is crucial for prioritization and response.
@@ -12,6 +13,8 @@ Risk scoring is crucial for prioritization and response.
 
 import logging
 from typing import Dict, Any, Optional
+
+from src.risk_assessment.asset_context import CRITICALITY_MULTIPLIERS, EXPOSURE_MULTIPLIERS
 
 
 class RiskScorer:
@@ -265,7 +268,18 @@ class RiskScorer:
         if context.get('privileged_user'):
             risk_score *= 1.15
             adjustments.append("Increased: Privileged user account")
-        
+
+        # Asset criticality and network exposure (see asset_context.py)
+        criticality = context.get('asset_criticality')
+        if criticality in CRITICALITY_MULTIPLIERS and CRITICALITY_MULTIPLIERS[criticality] != 1.0:
+            risk_score *= CRITICALITY_MULTIPLIERS[criticality]
+            direction = 'Increased' if CRITICALITY_MULTIPLIERS[criticality] > 1 else 'Decreased'
+            adjustments.append(f"{direction}: {criticality} asset criticality")
+        exposure = context.get('exposure')
+        if exposure in EXPOSURE_MULTIPLIERS and EXPOSURE_MULTIPLIERS[exposure] != 1.0:
+            risk_score *= EXPOSURE_MULTIPLIERS[exposure]
+            adjustments.append(f"Increased: {exposure} network exposure")
+
         # Ensure score stays within bounds
         risk_score = max(0.0, min(1.0, risk_score))
         

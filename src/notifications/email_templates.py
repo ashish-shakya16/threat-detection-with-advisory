@@ -19,6 +19,10 @@ class EmailTemplates:
     COMPANY_NAME = "SecureX"
     COMPANY_LOGO_URL = "https://example.com/logo.png"
     SUPPORT_EMAIL = "support@example.com"
+    SAFE_EVENT_KEYS = {
+        'process_name', 'pid', 'remote_ip', 'remote_port', 'local_address',
+        'status', 'reason', 'connection_count', 'threshold', 'event_type',
+    }
 
     @staticmethod
     def get_threat_color(risk_level: str) -> str:
@@ -58,7 +62,7 @@ class EmailTemplates:
         risk_score = threat.get('risk_score', 0)
         category = escape(threat.get('category', 'Unknown'))
         description = escape(threat.get('description', 'No description available'))
-        timestamp = threat.get('timestamp', 'Unknown')
+        timestamp = escape(str(threat.get('timestamp', threat.get('detected_at', 'Unknown'))))
 
         color = cls.get_threat_color(risk_level)
         icon = cls.get_threat_icon(risk_level)
@@ -175,7 +179,10 @@ class EmailTemplates:
             </div>
 """
 
-        event_data = threat.get('event_data', {})
+        event_data = {
+            key: value for key, value in (threat.get('event_data', {}) or {}).items()
+            if key in cls.SAFE_EVENT_KEYS
+        }
         if event_data:
             html_body += '<div class="detail-row"><div class="detail-label">Technical Details</div><div class="detail-value"><ul>'
             for key, value in event_data.items():
@@ -199,10 +206,19 @@ class EmailTemplates:
             </div>
 """
 
+        dashboard_url = threat.get('dashboard_url', '')
+        dashboard_link = ''
+        if dashboard_url:
+            dashboard_link = (
+                '<p><a href="' + escape(str(dashboard_url), quote=True) + '">'
+                'Open the authenticated SecureX dashboard</a></p>'
+            )
+
         html_body += """
             <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e0e0e0;">
                 <p><strong>Need help?</strong></p>
                 <p>Visit the SecureX dashboard to view more details, or contact our support team at """ + escape(cls.SUPPORT_EMAIL) + """</p>
+                """ + dashboard_link + """
             </div>
         </div>
 
@@ -238,9 +254,11 @@ TECHNICAL DETAILS:
             for i, step in enumerate(remediation_steps, 1):
                 text_body += f"{i}. {step}\n"
 
+        dashboard_text = f"\nOpen dashboard: {dashboard_url}\n" if dashboard_url else ''
         text_body += f"""
 
 Need help? Contact {cls.SUPPORT_EMAIL}
+    {dashboard_text}
 
 ---
 This is an automated security alert from SecureX. Do not reply to this email.

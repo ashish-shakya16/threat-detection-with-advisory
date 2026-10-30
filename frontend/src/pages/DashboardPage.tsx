@@ -10,14 +10,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { useStats } from '@/hooks/useStats';
 import { useSystemMetrics } from '@/hooks/useSystemMetrics';
-import { useSocket } from '@/hooks/useSocket';
 import { api } from '@/lib/api';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 
 export default function DashboardPage() {
-  useSocket();
   const queryClient = useQueryClient();
   const [monitoring, setMonitoring] = useState(false);
 

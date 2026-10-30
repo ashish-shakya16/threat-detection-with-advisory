@@ -1,0 +1,18 @@
+# Source: M. Sarhan, S. Layeghy, M. Portmann, "Towards a Standard Feature Set for Network
+# Intrusion Detection System Datasets," Mobile Netw. Appl., 2022 (arXiv:2101.11315v2), Table 8.
+# Extra Trees classifier, binary classification, 70/30 split, mean of five cross-validation splits.
+# original = dataset's own feature set; netflow_basic = 8/12-feature NetFlow set (NF-*);
+# netflow_extended = 43-feature NetFlow v9 set (NF-*-v2). far_pct = false alarm rate in percent.
+dataset,feature_set,f1,far_pct
+UNSW-NB15,original,0.92,0.35
+UNSW-NB15,netflow_basic,0.85,1.01
+UNSW-NB15,netflow_extended,0.97,0.16
+BoT-IoT,original,1.00,1.05
+BoT-IoT,netflow_basic,0.97,1.13
+BoT-IoT,netflow_extended,1.00,0.26
+ToN-IoT,original,0.99,2.10
+ToN-IoT,netflow_basic,1.00,0.37
+ToN-IoT,netflow_extended,1.00,0.58
+CSE-CIC-IDS2018,original,0.94,1.07
+CSE-CIC-IDS2018,netflow_basic,0.83,4.59
+CSE-CIC-IDS2018,netflow_extended,0.97,0.31

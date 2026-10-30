@@ -3,6 +3,7 @@
 import pytest
 import sys
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -51,6 +52,47 @@ def test_answer_question(ai_assistant):
     response = ai_assistant.answer_question("What is malware?")
     assert len(response) > 0
     assert isinstance(response, str)
+
+
+@patch('src.assistant.ai_assistant.requests.post')
+def test_answer_question_uses_configured_ai_provider(mock_post, monkeypatch):
+    """Test that enabled AI configuration sends the prompt to the provider."""
+    monkeypatch.setenv('SECUREX_AI_API_KEY', 'test-key')
+    provider_response = Mock()
+    provider_response.json.return_value = {
+        'choices': [{'message': {'content': 'Use MFA and update your software.'}}]
+    }
+    mock_post.return_value = provider_response
+
+    assistant = AIAssistant(config={
+        'ai': {
+            'enabled': True,
+            'model': 'test-model',
+            'base_url': 'https://example.test/v1/chat/completions',
+        }
+    })
+
+    response = assistant.answer_question('How do I protect my account?')
+
+    assert response == 'Use MFA and update your software.'
+    mock_post.assert_called_once()
+    request = mock_post.call_args.kwargs
+    assert request['headers']['Authorization'] == 'Bearer test-key'
+    assert request['json']['model'] == 'test-model'
+    assert request['json']['messages'][0]['role'] == 'system'
+
+
+@patch('src.assistant.ai_assistant.requests.post')
+def test_answer_question_falls_back_when_provider_fails(mock_post, monkeypatch):
+    """Test that provider errors do not break the local assistant."""
+    monkeypatch.setenv('SECUREX_AI_API_KEY', 'test-key')
+    mock_post.side_effect = Exception('provider unavailable')
+
+    assistant = AIAssistant(config={'ai': {'enabled': True}})
+
+    response = assistant.answer_question('What is ransomware?')
+
+    assert 'Ransomware is malicious software' in response
 
 
 def test_faq_answer(knowledge_base):

@@ -18,6 +18,14 @@ export function useAuth() {
     },
   });
 
+  const signupMutation = useMutation({
+    mutationFn: ({ username, email, password }: { username: string; email: string; password: string }) =>
+      api.auth.signup(username, email, password),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['auth', 'me'], data);
+    },
+  });
+
   const logoutMutation = useMutation({
     mutationFn: api.auth.logout,
     onSuccess: () => {
@@ -33,6 +41,9 @@ export function useAuth() {
     login: loginMutation.mutateAsync,
     loginError: loginMutation.error as ApiError | null,
     isLoggingIn: loginMutation.isPending,
+    signup: signupMutation.mutateAsync,
+    signupError: signupMutation.error as ApiError | null,
+    isSigningUp: signupMutation.isPending,
     logout: logoutMutation.mutateAsync,
   };
 }

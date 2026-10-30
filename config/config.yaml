@@ -90,6 +90,13 @@ risk_assessment:
     medium: 0.6
     high: 0.85
   
+  # Asset and exposure context (src/risk_assessment/asset_context.py).
+  # device_criticality: low | medium | high | critical. Set this to how
+  # important this machine is (e.g. "high" for a server holding customer data).
+  asset_context:
+    device_criticality: "medium"
+    privileged_accounts: ['nt authority\system', 'system', 'administrator', 'root']
+
   # Impact factors
   impact_factors:
     data_access: 3
@@ -103,6 +110,70 @@ advisory:
   language: "simple"  # simple, technical, detailed
   include_remediation: true
   include_examples: true
+
+# AI Assistant Configuration
+# The assistant always works offline using the local knowledge base. Set
+# enabled: true and put the API key in the environment variable named by
+# api_key_env (never in this file) to use a language model.
+# provider: "openai-compatible" (default URL: OpenAI), "huggingface"
+# (Hugging Face Inference router, e.g. model "meta-llama/Llama-3.1-8B-Instruct"),
+# or "ollama" (local, no key). base_url overrides the provider default.
+ai:
+  enabled: false
+  provider: "openai-compatible"
+  api_key_env: "SECUREX_AI_API_KEY"
+  base_url: ""
+  model: "gpt-4o-mini"
+  temperature: 0.2
+  max_tokens: 600
+  timeout_seconds: 30
+  # Retrieval-augmented generation (LangChain + ChromaDB + Sentence
+  # Transformers from requirements-ai.txt). Falls back to keyword retrieval
+  # if those packages or the embedding model are unavailable.
+  rag_enabled: true
+  embedding_model: "all-MiniLM-L6-v2"
+  chroma_path: "data/chroma_db"
+  knowledge_dir: "docs/security_knowledge"
+  max_distance: 0.65  # cosine distance cut-off for relevant evidence
+
+# Ransomware-like behaviour detection (src/detection/ransomware_monitor.py).
+# Watches these folders for bursts of file modifications, renames and
+# extension changes. Records paths and extensions only, never file contents.
+ransomware_detection:
+  enabled: true
+  # Missing folders are skipped; the %OneDrive% entries cover OneDrive-redirected folders.
+  watch_paths: ["~/Documents", "~/Desktop", "~/Pictures",
+                "%OneDrive%/Documents", "%OneDrive%/Desktop", "%OneDrive%/Pictures"]
+  thresholds:
+    window_seconds: 30
+    bulk_modification: 150   # distinct files created/modified in the window
+    rename_burst: 40         # distinct renames in the window
+    extension_change: 20     # renames to the same unusual new extension
+    many_directories: 15
+    cooldown_seconds: 300
+  ignored_extensions: []     # e.g. extensions your backup tool writes
+
+# Unknown-threat detection (src/detection/behaviour_baseline.py). Learns this
+# machine's normal per-process behaviour while monitoring runs, then flags
+# strong deviations as "Unknown suspicious activity". Learning assumes the
+# machine is not compromised during that time.
+anomaly_baseline:
+  enabled: true
+  min_cycles: 60             # monitoring cycles before training (~5 min at 5 s)
+  min_samples: 3000          # process snapshots before training
+  threshold_quantile: 0.995  # ~0.5% of normal snapshots would score this high
+  alert_cooldown_seconds: 3600
+
+# Graduated Response (src/response/response_manager.py)
+# High/Critical threats with a live process get *proposals* to suspend
+# (High+) or terminate (Critical) it. A logged-in user must approve each one.
+# With execution_enabled: false, approvals are recorded as dry runs and
+# nothing is done to the process.
+response:
+  execution_enabled: false
+  proposal_ttl_minutes: 30
+  max_executions_per_minute: 5
+  # protected_processes: [...]  # defaults to core Windows processes
 
 # Database Configuration
 database:
@@ -178,17 +249,22 @@ performance:
 
 # Email Notifications Configuration
 notifications:
-  enabled: false
+  enabled: true
   notify_on_critical: true
   notify_on_high: true
   notify_on_medium: false
   notify_on_low: false
-  recipients: []
+  cooldown_seconds: 300  # duplicate-alert suppression window per recipient
+  recipients:  # trusted admin addresses; others are added via email verification
+    - "rudrabhakt928@gmail.com"
   smtp:
     smtp_server: "smtp.gmail.com"
     smtp_port: 587
     sender_email: "your-email@gmail.com"
-    sender_password: "your-app-password"
+    sender_password: ""
+    sender_password_env: "SECUREX_SMTP_PASSWORD"
+    sender_email_env: "SECUREX_SMTP_SENDER"
     use_tls: true
+    timeout_seconds: 15
     retry_attempts: 3
     retry_delay: 2

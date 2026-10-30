@@ -19,6 +19,7 @@ import time
 try:
     from PyQt6.QtCore import QUrl
     from PyQt6.QtGui import QIcon
+    from PyQt6.QtNetwork import QLocalServer, QLocalSocket
     from PyQt6.QtWidgets import QApplication, QMessageBox
     from PyQt6.QtWebEngineWidgets import QWebEngineView
 except ImportError:
@@ -43,6 +44,27 @@ sys.path.insert(0, RESOURCE_DIR)
 
 HOST = "127.0.0.1"
 PORT = 5000
+INSTANCE_KEY = "SecureXThreatAdvisor-single-instance"
+
+
+def _load_env_file():
+    """
+    Load every KEY=VALUE from the .env next to the app (SMTP credentials,
+    AI key, THREAT_DB_PATH, ...) without overriding real environment
+    variables. The bundled backend cannot see the source tree's .env.
+    """
+    env_path = os.path.join(APP_DIR, ".env")
+    if not os.path.exists(env_path):
+        return
+    with open(env_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key, value = key.strip(), value.strip().strip('"').strip("'")
+            if key and value and key not in os.environ:
+                os.environ[key] = value
 
 
 def _ensure_secret_key():
@@ -86,7 +108,9 @@ def _start_backend() -> threading.Thread:
     from src.dashboard.app import app, socketio
 
     def _run():
-        socketio.run(app, host=HOST, port=PORT, debug=False, use_reloader=False, log_output=False)
+        # Loopback-only server for this desktop app, so the dev server is acceptable.
+        socketio.run(app, host=HOST, port=PORT, debug=False, use_reloader=False, log_output=False,
+                     allow_unsafe_werkzeug=True)
 
     thread = threading.Thread(target=_run, name="secureX-backend", daemon=True)
     thread.start()
@@ -107,6 +131,16 @@ def main():
     # double-clicked shortcut won't guarantee — pin it to where the bundled
     # (or, when not frozen, source-tree) resources actually live.
     os.chdir(RESOURCE_DIR)
+    # Windowed launches (pythonw, the packaged exe) have no console, so
+    # sys.stdout/stderr are None and Flask crashes printing its banner.
+    if sys.stdout is None or sys.stderr is None:
+        log_dir = os.path.join(APP_DIR, "data", "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = open(os.path.join(log_dir, "desktop.log"), "a", encoding="utf-8", buffering=1)
+        sys.stdout = sys.stdout or log_file
+        sys.stderr = sys.stderr or log_file
+    # Before the database path is chosen, so .env can set THREAT_DB_PATH.
+    _load_env_file()
 
     # The database is writable state, not bundle content — keep it next to
     # the exe (APP_DIR) so it survives reinstalls/updates of the bundle,
@@ -135,6 +169,20 @@ def main():
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
 
+    # One instance only. A second window would share the first one's backend
+    # thread and show "Failed to fetch" once the first window is closed, so
+    # instead ask the running instance to come to the front and exit.
+    probe = QLocalSocket()
+    probe.connectToServer(INSTANCE_KEY)
+    if probe.waitForConnected(500):
+        probe.write(b"raise")
+        probe.waitForBytesWritten(500)
+        probe.disconnectFromServer()
+        sys.exit(0)
+    QLocalServer.removeServer(INSTANCE_KEY)  # stale name left by a crashed instance
+    instance_server = QLocalServer()
+    instance_server.listen(INSTANCE_KEY)
+
     if not _port_is_open(HOST, PORT):
         _start_backend()
         if not _wait_for_backend():
@@ -149,9 +197,22 @@ def main():
     view.setWindowTitle("SecureX Threat Advisor")
     if os.path.exists(icon_path):
         view.setWindowIcon(QIcon(icon_path))
-    view.resize(1440, 900)
+    view.setGeometry(100, 60, 1440, 900)
     view.load(QUrl(f"http://{HOST}:{PORT}/"))
+    view.showNormal()
     view.show()
+    view.raise_()
+    view.activateWindow()
+
+    def _bring_to_front():
+        while instance_server.hasPendingConnections():
+            instance_server.nextPendingConnection().close()
+        if view.isMinimized():
+            view.showNormal()
+        view.raise_()
+        view.activateWindow()
+
+    instance_server.newConnection.connect(_bring_to_front)
 
     sys.exit(app.exec())
 
