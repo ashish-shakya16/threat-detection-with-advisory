@@ -119,11 +119,11 @@ advisory:
 # (Hugging Face Inference router, e.g. model "meta-llama/Llama-3.1-8B-Instruct"),
 # or "ollama" (local, no key). base_url overrides the provider default.
 ai:
-  enabled: false
-  provider: "openai-compatible"
+  enabled: true
+  provider: "huggingface"
   api_key_env: "SECUREX_AI_API_KEY"
   base_url: ""
-  model: "gpt-4o-mini"
+  model: "meta-llama/Llama-3.1-8B-Instruct"
   temperature: 0.2
   max_tokens: 600
   timeout_seconds: 30
